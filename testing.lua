@@ -1,157 +1,161 @@
-local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-
--- Create ScreenGui
+local player = game.Players.LocalPlayer
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "PetLevelerUI"
 screenGui.ResetOnSpawn = false
 
--- Create Main Frame
+-- Main Frame
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 400, 0, 300)
 mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
 mainFrame.BackgroundTransparency = 0.5
-mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
-mainFrame.Name = "MainFrame"
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.Visible = true
 
--- UICorner for rounded frame
+-- UICorner
 local corner = Instance.new("UICorner", mainFrame)
-corner.CornerRadius = UDim.new(0, 15)
+corner.CornerRadius = UDim.new(0, 12)
 
--- Rainbow title
+-- UI Title
 local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.Text = "🌈 PET LEVELER 🌈"
-title.TextColor3 = Color3.new(1, 1, 1)
+title.Size = UDim2.new(1, -40, 0, 40)
+title.Position = UDim2.new(0, 20, 0, 0)
 title.BackgroundTransparency = 1
+title.Text = "🌈 PET LEVELER 🌈"
+title.Font = Enum.Font.GothamBlack
 title.TextScaled = true
-title.Font = Enum.Font.GothamBold
-title.Name = "RainbowTitle"
+title.TextColor3 = Color3.fromHSV(tick() % 5 / 5, 1, 1)
 
--- Rainbow effect
-task.spawn(function()
+-- Animate rainbow title
+spawn(function()
 	while true do
-		for hue = 0, 1, 0.01 do
-			title.TextColor3 = Color3.fromHSV(hue, 1, 1)
-			task.wait(0.05)
-		end
+		title.TextColor3 = Color3.fromHSV(tick() % 5 / 5, 1, 1)
+		wait(0.1)
 	end
 end)
 
--- Dropdown (pet selector)
-local petDropdown = Instance.new("TextButton", mainFrame)
-petDropdown.Size = UDim2.new(0.9, 0, 0, 40)
-petDropdown.Position = UDim2.new(0.05, 0, 0, 60)
-petDropdown.Text = "Select Pet"
-petDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-petDropdown.TextColor3 = Color3.new(1, 1, 1)
-petDropdown.Font = Enum.Font.Gotham
-petDropdown.TextScaled = true
-Instance.new("UICorner", petDropdown)
+-- Dropdown label
+local dropdownLabel = Instance.new("TextLabel", mainFrame)
+dropdownLabel.Position = UDim2.new(0, 20, 0, 60)
+dropdownLabel.Size = UDim2.new(0, 360, 0, 30)
+dropdownLabel.BackgroundTransparency = 1
+dropdownLabel.Text = "Select Pet:"
+dropdownLabel.Font = Enum.Font.Gotham
+dropdownLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropdownLabel.TextSize = 18
 
--- Pet options
-local petList = {"Red Fox", "Kitsune", "Corrupted Kitsune", "Raccoon", "Butterfly"}
+-- Dropdown
+local dropdown = Instance.new("TextButton", mainFrame)
+dropdown.Position = UDim2.new(0, 20, 0, 90)
+dropdown.Size = UDim2.new(0, 360, 0, 30)
+dropdown.Text = "Choose a Pet"
+dropdown.Font = Enum.Font.Gotham
+dropdown.TextSize = 16
+dropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+dropdown.TextColor3 = Color3.fromRGB(255, 255, 255)
+local dropCorner = Instance.new("UICorner", dropdown)
+dropCorner.CornerRadius = UDim.new(0, 6)
+
+local petOptions = {"Red Fox", "Kitsune", "Raccoon"}
 local selectedPet = nil
+local petLevel = 1
 
--- Info Labels
+-- Stats Display
 local weightLabel = Instance.new("TextLabel", mainFrame)
-weightLabel.Size = UDim2.new(0.9, 0, 0, 30)
-weightLabel.Position = UDim2.new(0.05, 0, 0, 120)
-weightLabel.Text = "Weight: -"
-weightLabel.TextColor3 = Color3.new(1, 1, 1)
+weightLabel.Position = UDim2.new(0, 20, 0, 130)
+weightLabel.Size = UDim2.new(0, 360, 0, 30)
 weightLabel.BackgroundTransparency = 1
-weightLabel.TextScaled = true
 weightLabel.Font = Enum.Font.Gotham
+weightLabel.TextSize = 16
+weightLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+weightLabel.Text = "Weight: --"
 
 local ageLabel = Instance.new("TextLabel", mainFrame)
-ageLabel.Size = UDim2.new(0.9, 0, 0, 30)
-ageLabel.Position = UDim2.new(0.05, 0, 0, 160)
-ageLabel.Text = "Age: -"
-ageLabel.TextColor3 = Color3.new(1, 1, 1)
+ageLabel.Position = UDim2.new(0, 20, 0, 160)
+ageLabel.Size = UDim2.new(0, 360, 0, 30)
 ageLabel.BackgroundTransparency = 1
-ageLabel.TextScaled = true
 ageLabel.Font = Enum.Font.Gotham
+ageLabel.TextSize = 16
+ageLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+ageLabel.Text = "Age: --"
+
+local levelLabel = Instance.new("TextLabel", mainFrame)
+levelLabel.Position = UDim2.new(0, 20, 0, 190)
+levelLabel.Size = UDim2.new(0, 360, 0, 30)
+levelLabel.BackgroundTransparency = 1
+levelLabel.Font = Enum.Font.Gotham
+levelLabel.TextSize = 16
+levelLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+levelLabel.Text = "Level: 1"
 
 -- Level Up Button
-local levelUpBtn = Instance.new("TextButton", mainFrame)
-levelUpBtn.Size = UDim2.new(0.9, 0, 0, 40)
-levelUpBtn.Position = UDim2.new(0.05, 0, 0, 210)
-levelUpBtn.Text = "Level Up Pet"
-levelUpBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 255)
-levelUpBtn.TextColor3 = Color3.new(1, 1, 1)
-levelUpBtn.Font = Enum.Font.GothamBold
-levelUpBtn.TextScaled = true
-Instance.new("UICorner", levelUpBtn)
+local levelUpButton = Instance.new("TextButton", mainFrame)
+levelUpButton.Position = UDim2.new(0, 20, 0, 230)
+levelUpButton.Size = UDim2.new(0, 360, 0, 40)
+levelUpButton.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
+levelUpButton.Text = "Level Up Pet"
+levelUpButton.Font = Enum.Font.GothamBold
+levelUpButton.TextSize = 18
+levelUpButton.TextColor3 = Color3.new(1, 1, 1)
+local levelUpCorner = Instance.new("UICorner", levelUpButton)
+levelUpCorner.CornerRadius = UDim.new(0, 8)
 
 -- Close Button
 local closeBtn = Instance.new("TextButton", mainFrame)
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Position = UDim2.new(1, -30, 0, 5)
+closeBtn.Size = UDim2.new(0, 25, 0, 25)
 closeBtn.Text = "X"
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextScaled = true
-Instance.new("UICorner", closeBtn)
+closeBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
+closeBtn.BackgroundTransparency = 1
 
 -- Minimize Button
-local miniBtn = Instance.new("TextButton", mainFrame)
-miniBtn.Size = UDim2.new(0, 30, 0, 30)
-miniBtn.Position = UDim2.new(1, -70, 0, 5)
-miniBtn.Text = "_"
-miniBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-miniBtn.TextColor3 = Color3.new(1, 1, 1)
-miniBtn.Font = Enum.Font.GothamBold
-miniBtn.TextScaled = true
-Instance.new("UICorner", miniBtn)
+local minimizeBtn = Instance.new("TextButton", mainFrame)
+minimizeBtn.Position = UDim2.new(1, -60, 0, 5)
+minimizeBtn.Size = UDim2.new(0, 25, 0, 25)
+minimizeBtn.Text = "-"
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+minimizeBtn.BackgroundTransparency = 1
 
--- Functions
+-- Dropdown logic
+dropdown.MouseButton1Click:Connect(function()
+	selectedPet = petOptions[math.random(1, #petOptions)]
+	dropdown.Text = selectedPet
 
-local function simulatePetStats()
-	local weight = math.random(3, 25) + math.random()
-	local age = math.random(5, 100)
-	weightLabel.Text = "Weight: " .. string.format("%.1f", weight) .. " kg"
-	ageLabel.Text = "Age: " .. age .. " days"
-end
+	-- Random weight/age
+	local weight = math.random(15, 60) / 10
+	local age = math.random(1, 12)
+	local ageUnit = (age < 2) and "month" or "months"
 
--- Dropdown click (simulated pet picker)
-petDropdown.MouseButton1Click:Connect(function()
-	local randomPet = petList[math.random(1, #petList)]
-	selectedPet = randomPet
-	petDropdown.Text = "Pet: " .. selectedPet
-	simulatePetStats()
+	weightLabel.Text = "Weight: " .. weight .. "kg"
+	ageLabel.Text = "Age: " .. age .. " " .. ageUnit
+	petLevel = 1
+	levelLabel.Text = "Level: " .. tostring(petLevel)
 end)
 
--- Level Up click
-levelUpBtn.MouseButton1Click:Connect(function()
+-- Level up logic
+levelUpButton.MouseButton1Click:Connect(function()
 	if selectedPet then
-		levelUpBtn.Text = selectedPet .. " leveled up!"
-		task.wait(1)
-		levelUpBtn.Text = "Level Up Pet"
-	else
-		levelUpBtn.Text = "Select a pet first!"
-		task.wait(1.5)
-		levelUpBtn.Text = "Level Up Pet"
+		petLevel += 1
+		levelLabel.Text = "Level: " .. tostring(petLevel)
 	end
 end)
 
--- Close
+-- Close logic
 closeBtn.MouseButton1Click:Connect(function()
 	mainFrame.Visible = false
 end)
 
--- Minimize
-local minimized = false
-miniBtn.MouseButton1Click:Connect(function()
-	minimized = not minimized
+-- Minimize logic
+minimizeBtn.MouseButton1Click:Connect(function()
 	for _, child in ipairs(mainFrame:GetChildren()) do
-		if child:IsA("GuiObject") and child.Name ~= "RainbowTitle" and child ~= miniBtn and child ~= closeBtn then
-			child.Visible = not minimized
+		if child:IsA("TextLabel") or child:IsA("TextButton") then
+			if child ~= title and child ~= minimizeBtn and child ~= closeBtn then
+				child.Visible = not child.Visible
+			end
 		end
 	end
 end)
