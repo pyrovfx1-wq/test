@@ -6,7 +6,6 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- Divine + (no Prismatic available yet)
 local pets = {
-    { Name = "Blood Owl", Weight = "---", Age = "---" },
     { Name = "Dragonfly", Weight = "---", Age = "---" },
     { Name = "Queen Bee", Weight = "---", Age = "---" },
     { Name = "Disco Bee", Weight = "---", Age = "---" },
