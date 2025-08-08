@@ -1,172 +1,158 @@
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
 
--- Remove old UI if it exists
-if playerGui:FindFirstChild("PetLevelerUI") then
-	playerGui:FindFirstChild("PetLevelerUI"):Destroy()
-end
-
--- UI Container
-local screenGui = Instance.new("ScreenGui", playerGui)
+-- Create ScreenGui
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "PetLevelerUI"
 screenGui.ResetOnSpawn = false
 
--- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 400, 0, 250)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -125)
+-- Create Main Frame
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 400, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
 mainFrame.BackgroundTransparency = 0.5
-mainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 mainFrame.BorderSizePixel = 0
 mainFrame.ClipsDescendants = true
 mainFrame.Name = "MainFrame"
-mainFrame.Parent = screenGui
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.Visible = true
 
--- Rounded corners
-local uiCorner = Instance.new("UICorner", mainFrame)
-uiCorner.CornerRadius = UDim.new(0, 12)
+-- UICorner for rounded frame
+local corner = Instance.new("UICorner", mainFrame)
+corner.CornerRadius = UDim.new(0, 15)
 
--- Rainbow Title
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 0, 40)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "🌈 PET LEVELER"
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.TextSize = 24
-titleLabel.TextStrokeTransparency = 0.7
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Name = "Title"
-titleLabel.Parent = mainFrame
+-- Rainbow title
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 40)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.Text = "🌈 PET LEVELER 🌈"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.BackgroundTransparency = 1
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Name = "RainbowTitle"
 
--- Rainbow effect on title
+-- Rainbow effect
 task.spawn(function()
-	local hue = 0
-	while titleLabel and titleLabel.Parent do
-		titleLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
-		hue = (hue + 0.01) % 1
-		task.wait(0.05)
+	while true do
+		for hue = 0, 1, 0.01 do
+			title.TextColor3 = Color3.fromHSV(hue, 1, 1)
+			task.wait(0.05)
+		end
 	end
 end)
 
--- Pet Dropdown (Simulation)
-local petSelector = Instance.new("TextButton")
-petSelector.Size = UDim2.new(0.6, 0, 0, 35)
-petSelector.Position = UDim2.new(0.05, 0, 0.25, 0)
-petSelector.Text = "🐶 Select Pet ▼"
-petSelector.Font = Enum.Font.Gotham
-petSelector.TextSize = 16
-petSelector.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-petSelector.TextColor3 = Color3.new(1, 1, 1)
-petSelector.Parent = mainFrame
+-- Dropdown (pet selector)
+local petDropdown = Instance.new("TextButton", mainFrame)
+petDropdown.Size = UDim2.new(0.9, 0, 0, 40)
+petDropdown.Position = UDim2.new(0.05, 0, 0, 60)
+petDropdown.Text = "Select Pet"
+petDropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+petDropdown.TextColor3 = Color3.new(1, 1, 1)
+petDropdown.Font = Enum.Font.Gotham
+petDropdown.TextScaled = true
+Instance.new("UICorner", petDropdown)
 
-local petDropdown = Instance.new("Frame")
-petDropdown.Size = UDim2.new(0.6, 0, 0, 100)
-petDropdown.Position = UDim2.new(0.05, 0, 0.4, 0)
-petDropdown.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-petDropdown.Visible = false
-petDropdown.Parent = mainFrame
+-- Pet options
+local petList = {"Red Fox", "Kitsune", "Corrupted Kitsune", "Raccoon", "Butterfly"}
+local selectedPet = nil
 
-local uiCorner2 = Instance.new("UICorner", petDropdown)
-uiCorner2.CornerRadius = UDim.new(0, 6)
-
-local petList = {"Red Fox", "Kitsune", "Dragon", "Raccoon"}
-
-for i, petName in ipairs(petList) do
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, 0, 0, 25)
-	btn.Position = UDim2.new(0, 0, 0, (i - 1) * 25)
-	btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
-	btn.TextColor3 = Color3.new(1, 1, 1)
-	btn.Font = Enum.Font.Gotham
-	btn.TextSize = 14
-	btn.Text = petName
-	btn.Parent = petDropdown
-
-	btn.MouseButton1Click:Connect(function()
-		petSelector.Text = "🐾 " .. petName
-		selectedPet = petName
-		petDropdown.Visible = false
-		-- Generate random stats
-		weightLabel.Text = "Weight: " .. string.format("%.1f", math.random(5, 40) + math.random()) .. " kg"
-		ageLabel.Text = "Age: " .. string.format("%.1f", math.random(1, 5) + math.random()) .. " yrs"
-	end)
-end
-
-petSelector.MouseButton1Click:Connect(function()
-	petDropdown.Visible = not petDropdown.Visible
-end)
-
--- Weight Label
-local weightLabel = Instance.new("TextLabel")
-weightLabel.Size = UDim2.new(0.4, 0, 0, 25)
-weightLabel.Position = UDim2.new(0.65, 0, 0.25, 0)
-weightLabel.BackgroundTransparency = 1
+-- Info Labels
+local weightLabel = Instance.new("TextLabel", mainFrame)
+weightLabel.Size = UDim2.new(0.9, 0, 0, 30)
+weightLabel.Position = UDim2.new(0.05, 0, 0, 120)
+weightLabel.Text = "Weight: -"
 weightLabel.TextColor3 = Color3.new(1, 1, 1)
-weightLabel.Text = "Weight: - kg"
+weightLabel.BackgroundTransparency = 1
+weightLabel.TextScaled = true
 weightLabel.Font = Enum.Font.Gotham
-weightLabel.TextSize = 16
-weightLabel.Parent = mainFrame
 
--- Age Label
-local ageLabel = Instance.new("TextLabel")
-ageLabel.Size = UDim2.new(0.4, 0, 0, 25)
-ageLabel.Position = UDim2.new(0.65, 0, 0.35, 0)
-ageLabel.BackgroundTransparency = 1
+local ageLabel = Instance.new("TextLabel", mainFrame)
+ageLabel.Size = UDim2.new(0.9, 0, 0, 30)
+ageLabel.Position = UDim2.new(0.05, 0, 0, 160)
+ageLabel.Text = "Age: -"
 ageLabel.TextColor3 = Color3.new(1, 1, 1)
-ageLabel.Text = "Age: - yrs"
+ageLabel.BackgroundTransparency = 1
+ageLabel.TextScaled = true
 ageLabel.Font = Enum.Font.Gotham
-ageLabel.TextSize = 16
-ageLabel.Parent = mainFrame
 
 -- Level Up Button
-local levelUpBtn = Instance.new("TextButton")
-levelUpBtn.Size = UDim2.new(0.6, 0, 0, 40)
-levelUpBtn.Position = UDim2.new(0.2, 0, 0.7, 0)
-levelUpBtn.Text = "⬆️ LEVEL UP PET"
-levelUpBtn.Font = Enum.Font.GothamBold
-levelUpBtn.TextSize = 18
+local levelUpBtn = Instance.new("TextButton", mainFrame)
+levelUpBtn.Size = UDim2.new(0.9, 0, 0, 40)
+levelUpBtn.Position = UDim2.new(0.05, 0, 0, 210)
+levelUpBtn.Text = "Level Up Pet"
+levelUpBtn.BackgroundColor3 = Color3.fromRGB(80, 130, 255)
 levelUpBtn.TextColor3 = Color3.new(1, 1, 1)
-levelUpBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-levelUpBtn.Parent = mainFrame
+levelUpBtn.Font = Enum.Font.GothamBold
+levelUpBtn.TextScaled = true
+Instance.new("UICorner", levelUpBtn)
 
--- Minimize and Close
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 24, 0, 24)
-closeBtn.Position = UDim2.new(1, -30, 0, 6)
-closeBtn.Text = "✖"
-closeBtn.BackgroundTransparency = 1
-closeBtn.TextColor3 = Color3.new(1, 0.3, 0.3)
+-- Close Button
+local closeBtn = Instance.new("TextButton", mainFrame)
+closeBtn.Size = UDim2.new(0, 30, 0, 30)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
+closeBtn.Text = "X"
+closeBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 16
-closeBtn.Parent = mainFrame
+closeBtn.TextScaled = true
+Instance.new("UICorner", closeBtn)
 
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 24, 0, 24)
-minimizeBtn.Position = UDim2.new(1, -60, 0, 6)
-minimizeBtn.Text = "_"
-minimizeBtn.BackgroundTransparency = 1
-minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.TextSize = 16
-minimizeBtn.Parent = mainFrame
+-- Minimize Button
+local miniBtn = Instance.new("TextButton", mainFrame)
+miniBtn.Size = UDim2.new(0, 30, 0, 30)
+miniBtn.Position = UDim2.new(1, -70, 0, 5)
+miniBtn.Text = "_"
+miniBtn.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+miniBtn.TextColor3 = Color3.new(1, 1, 1)
+miniBtn.Font = Enum.Font.GothamBold
+miniBtn.TextScaled = true
+Instance.new("UICorner", miniBtn)
 
-minimizeBtn.MouseButton1Click:Connect(function()
-	mainFrame.Visible = false
-	wait(0.3)
-	mainFrame.Visible = true
+-- Functions
+
+local function simulatePetStats()
+	local weight = math.random(3, 25) + math.random()
+	local age = math.random(5, 100)
+	weightLabel.Text = "Weight: " .. string.format("%.1f", weight) .. " kg"
+	ageLabel.Text = "Age: " .. age .. " days"
+end
+
+-- Dropdown click (simulated pet picker)
+petDropdown.MouseButton1Click:Connect(function()
+	local randomPet = petList[math.random(1, #petList)]
+	selectedPet = randomPet
+	petDropdown.Text = "Pet: " .. selectedPet
+	simulatePetStats()
 end)
 
-closeBtn.MouseButton1Click:Connect(function()
-	screenGui:Destroy()
-end)
-
+-- Level Up click
 levelUpBtn.MouseButton1Click:Connect(function()
 	if selectedPet then
-		levelUpBtn.Text = "✅ Pet Leveled!"
-		wait(1)
-		levelUpBtn.Text = "⬆️ LEVEL UP PET"
+		levelUpBtn.Text = selectedPet .. " leveled up!"
+		task.wait(1)
+		levelUpBtn.Text = "Level Up Pet"
+	else
+		levelUpBtn.Text = "Select a pet first!"
+		task.wait(1.5)
+		levelUpBtn.Text = "Level Up Pet"
+	end
+end)
+
+-- Close
+closeBtn.MouseButton1Click:Connect(function()
+	mainFrame.Visible = false
+end)
+
+-- Minimize
+local minimized = false
+miniBtn.MouseButton1Click:Connect(function()
+	minimized = not minimized
+	for _, child in ipairs(mainFrame:GetChildren()) do
+		if child:IsA("GuiObject") and child.Name ~= "RainbowTitle" and child ~= miniBtn and child ~= closeBtn then
+			child.Visible = not minimized
+		end
 	end
 end)
 
