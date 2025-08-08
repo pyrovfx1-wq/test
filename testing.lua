@@ -2,172 +2,117 @@ local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Simulated Inventory (for testing)
--- In a real game, this would connect to actual pet objects
-local pets = {
-    {Name = "Raccoon", Weight = 8.6, Age = 12},
-    {Name = "Red Fox", Weight = 7.1, Age = 8},
-    {Name = "Rabbit", Weight = 4.4, Age = 5},
-    {Name = "Corrupted Kitsune", Weight = 9.9, Age = 15}
+-- List of pets
+local petList = {
+    "Raccoon",
+    "Red Fox",
+    "Dragonfly",
+    "Spinosaurus",
+    "Corrupted Kitsune"
 }
 
--- Create GUI
-local screenGui = Instance.new("ScreenGui")
+local screenGui = Instance.new("ScreenGui", playerGui)
 screenGui.Name = "PetLevelerUI"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = playerGui
 
--- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 400, 0, 300)
-mainFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-mainFrame.BackgroundTransparency = 0.5
-mainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-mainFrame.BorderSizePixel = 0
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 400, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -200, 0.5, -175)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.Parent = screenGui
-
--- UICorner for round edges
-local corner = Instance.new("UICorner")
+mainFrame.BackgroundTransparency = 0.5
+mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+local corner = Instance.new("UICorner", mainFrame)
 corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = mainFrame
 
 -- Rainbow Title
-local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 50)
 title.BackgroundTransparency = 1
 title.Text = "Pet Leveler"
-title.TextScaled = true
 title.Font = Enum.Font.GothamBold
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Parent = mainFrame
-
--- Animate rainbow title
+title.TextScaled = true
+title.TextColor3 = Color3.new(1, 0, 0)
 spawn(function()
+    local hue = 0
     while true do
-        for i = 0, 1, 0.01 do
-            title.TextColor3 = Color3.fromHSV(i, 1, 1)
-            wait(0.05)
-        end
+        title.TextColor3 = Color3.fromHSV(hue, 1, 1)
+        hue = hue + 0.01
+        if hue >= 1 then hue = 0 end
+        task.wait(0.03)
     end
 end)
 
--- Dropdown (pet selector)
-local dropdown = Instance.new("TextButton")
-dropdown.Size = UDim2.new(0, 200, 0, 40)
-dropdown.Position = UDim2.new(0.5, -100, 0, 60)
+-- Dropdown
+local dropdown = Instance.new("TextButton", mainFrame)
+dropdown.Size = UDim2.new(0.9, 0, 0, 40)
+dropdown.Position = UDim2.new(0.05, 0, 0, 60)
 dropdown.Text = "Select Pet"
-dropdown.TextScaled = true
 dropdown.Font = Enum.Font.Gotham
+dropdown.TextScaled = true
+dropdown.BackgroundColor3 = Color3.fromRGB(50,50,50)
+dropdown.TextColor3 = Color3.new(1,1,1)
 
-dropdown.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-dropdown.TextColor3 = Color3.new(1, 1, 1)
-dropdown.Parent = mainFrame
+local menu = Instance.new("Frame", mainFrame)
+menu.Size = UDim2.new(0.9, 0, 0, #petList * 30)
+menu.Position = UDim2.new(0.05, 0, 0, 110)
+menu.Visible = false
+menu.BackgroundColor3 = Color3.fromRGB(60,60,60)
+menu.ClipsDescendants = true
 
--- Dropdown menu
-local dropdownMenu = Instance.new("Frame")
-dropdownMenu.Size = UDim2.new(0, 200, 0, #pets * 30)
-dropdownMenu.Position = UDim2.new(0.5, -100, 0, 100)
-dropdownMenu.Visible = false
-dropdownMenu.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-dropdownMenu.BorderSizePixel = 0
-dropdownMenu.Parent = mainFrame
-
-local uiList = Instance.new("UIListLayout")
-uiList.FillDirection = Enum.FillDirection.Vertical
-uiList.Padding = UDim.new(0, 2)
-uiList.Parent = dropdownMenu
-
-local selectedPet
-
-for _, pet in ipairs(pets) do
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, 0, 0, 30)
-    button.Text = pet.Name
-    button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-    button.TextColor3 = Color3.new(1, 1, 1)
-    button.Font = Enum.Font.Gotham
-    button.TextScaled = true
-    button.Parent = dropdownMenu
-
-    button.MouseButton1Click:Connect(function()
-        selectedPet = pet
-        dropdown.Text = pet.Name
-        dropdownMenu.Visible = false
+for i, petName in ipairs(petList) do
+    local btn = Instance.new("TextButton", menu)
+    btn.Size = UDim2.new(1, 0, 0, 30)
+    btn.Position = UDim2.new(0, 0, 0, (i-1)*30)
+    btn.Text = petName
+    btn.Font = Enum.Font.Gotham
+    btn.TextColor3 = Color3.new(1,1,1)
+    btn.TextScaled = true
+    btn.BackgroundColor3 = Color3.fromRGB(70,70,70)
+    btn.MouseButton1Click:Connect(function()
+        dropdown.Text = petName
+        infoLabel.Text = ("Name: %s\nWeight: ---\nAge: ---"):format(petName)
+        menu.Visible = false
     end)
 end
 
 dropdown.MouseButton1Click:Connect(function()
-    dropdownMenu.Visible = not dropdownMenu.Visible
+    menu.Visible = not menu.Visible
 end)
 
--- Pet Info Labels
-local petInfo = Instance.new("TextLabel")
-petInfo.Position = UDim2.new(0, 20, 0, 160)
-petInfo.Size = UDim2.new(1, -40, 0, 60)
-petInfo.BackgroundTransparency = 1
-petInfo.TextColor3 = Color3.new(1, 1, 1)
-petInfo.Font = Enum.Font.GothamSemibold
-petInfo.TextScaled = true
-petInfo.Text = "Select a pet to view info."
-petInfo.Parent = mainFrame
+-- Info Label
+local infoLabel = Instance.new("TextLabel", mainFrame)
+infoLabel.Position = UDim2.new(0.05, 0, 0, 110 + #petList*30 + 10)
+infoLabel.Size = UDim2.new(0.9, 0, 0, 100)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "Select a pet..."
+infoLabel.TextColor3 = Color3.new(1,1,1)
+infoLabel.Font = Enum.Font.Gotham
+infoLabel.TextScaled = true
+infoLabel.TextWrapped = true
+infoLabel.TextYAlignment = Enum.TextYAlignment.Top
 
 -- Level Up Button
-local levelUpBtn = Instance.new("TextButton")
-levelUpBtn.Size = UDim2.new(0, 150, 0, 40)
-levelUpBtn.Position = UDim2.new(0.5, -75, 1, -50)
-levelUpBtn.Text = "Level Up"
-levelUpBtn.TextScaled = true
-levelUpBtn.Font = Enum.Font.GothamBold
-levelUpBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-levelUpBtn.TextColor3 = Color3.new(1, 1, 1)
-levelUpBtn.Parent = mainFrame
-
-levelUpBtn.MouseButton1Click:Connect(function()
-    if selectedPet then
-        print("Leveling up:", selectedPet.Name)
-    end
+local levelBtn = Instance.new("TextButton", mainFrame)
+levelBtn.Size = UDim2.new(0.9, 0, 0, 40)
+levelBtn.Position = UDim2.new(0.05, 0, 0, 300)
+levelBtn.Text = "Level Up (Visual Only)"
+levelBtn.Font = Enum.Font.GothamBold
+levelBtn.TextScaled = true
+levelBtn.TextColor3 = Color3.new(1,1,1)
+levelBtn.BackgroundColor3 = Color3.fromRGB(0,170,0)
+levelBtn.MouseButton1Click:Connect(function()
+    print("Level Up " .. dropdown.Text)
 end)
-
--- Real-time update loop
-spawn(function()
-    while true do
-        if selectedPet then
-            petInfo.Text = "Name: " .. selectedPet.Name ..
-                           "\nWeight: " .. selectedPet.Weight ..
-                           "\nAge: " .. selectedPet.Age
-        end
-        wait(0.5)
-    end
-end)
-
--- Minimize Button
-local minimizeBtn = Instance.new("TextButton")
-minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -60, 0, 5)
-minimizeBtn.Text = "_"
-minimizeBtn.TextScaled = true
-minimizeBtn.Font = Enum.Font.GothamBold
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-minimizeBtn.TextColor3 = Color3.new(1, 1, 1)
-minimizeBtn.Parent = mainFrame
 
 -- Close Button
-local closeBtn = Instance.new("TextButton")
+local closeBtn = Instance.new("TextButton", mainFrame)
 closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -30, 0, 5)
+closeBtn.Position = UDim2.new(1, -35, 0, 5)
 closeBtn.Text = "X"
-closeBtn.TextScaled = true
 closeBtn.Font = Enum.Font.GothamBold
-closeBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
-closeBtn.TextColor3 = Color3.new(1, 1, 1)
-closeBtn.Parent = mainFrame
-
-minimizeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-end)
-
+closeBtn.TextScaled = true
+closeBtn.TextColor3 = Color3.new(1,1,1)
+closeBtn.BackgroundColor3 = Color3.fromRGB(170,0,0)
 closeBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
