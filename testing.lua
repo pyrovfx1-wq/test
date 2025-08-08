@@ -1,10 +1,7 @@
--- Place this LocalScript under StarterPlayerScripts or StarterGui
-
 local Players = game:GetService("Players")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
--- Divine + (no Prismatic available yet)
 local pets = {
     { Name = "Dragonfly", Weight = "---", Age = "---" },
     { Name = "Queen Bee", Weight = "---", Age = "---" },
