@@ -376,5 +376,3 @@ closeBtn.MouseButton1Click:Connect(function()
     activeClones = {}
     pcall(function() gui:Destroy() end)
 end)
-
-print("[TOCHIPYRO] Ready. Use Detect then Size Enlarge. If still not working, paste the executor output here.")
