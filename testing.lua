@@ -1,131 +1,121 @@
--- TOCHIPYRO Script (Grow a Garden) with improved visibility and persistence
+-- TOCHIPYRO Script (Grow a Garden) with pet enlargement and weight increase
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ENLARGE_SCALE = 1.75
-local WEIGHT_MULTIPLIER = 2.5 -- How much to multiply the weight by
+local WEIGHT_MULTIPLIER = 2.5
 
 -- Containers to monitor for pet spawns
 local petContainers = {
     workspace,
     workspace:FindFirstChild("Pets"),
     workspace:FindFirstChild("PetSlots"),
-    workspace:FindFirstChild("GardenSlots"), -- Added garden slots
+    workspace:FindFirstChild("GardenSlots"),
 }
 
 local enlargedPetIds = {}
 local petConnections = {}
 local petUpdateLoops = {}
-local originalWeights = {} -- Store original weights
+local originalWeights = {}
 
--- Function to increase pet weight visually
-local function increasePetWeight(petModel)
+-- Simple weight increase function
+local function increaseWeightDisplay(petModel)
     if not petModel then return end
     
     local id = getPetUniqueId(petModel)
     if not id then return end
     
-    -- Common weight attribute names in pet games
-    local weightAttributes = {
-        "Weight", "weight", "WeightKG", "Mass", "mass", "PetWeight", "petWeight"
+    -- Try to find existing weight in the pet's attributes/values
+    local currentWeight = nil
+    local weightSources = {
+        petModel:FindFirstChild("Weight"),
+        petModel:FindFirstChild("weight"),
+        petModel:GetAttribute("Weight"),
+        petModel:GetAttribute("weight"),
+        petModel:GetAttribute("WeightKG")
     }
     
-    local weightFound = false
-    local originalWeight = nil
-    
-    -- Try to find existing weight attributes
-    for _, attrName in ipairs(weightAttributes) do
-        local currentWeight = petModel:GetAttribute(attrName)
-        if currentWeight and type(currentWeight) == "number" then
-            originalWeight = currentWeight
-            weightFound = true
-            break
+    for _, source in ipairs(weightSources) do
+        if source then
+            if type(source) == "number" then
+                currentWeight = source
+                break
+            elseif source.Value then
+                currentWeight = source.Value
+                break
+            end
         end
     end
     
-    -- Store original weight if not already stored
+    -- If no weight found, set a default based on pet name
+    if not currentWeight then
+        currentWeight = 2.5 -- Default weight
+        if string.find(petModel.Name:lower(), "huge") then
+            currentWeight = 6.0
+        elseif string.find(petModel.Name:lower(), "titanic") then
+            currentWeight = 8.5
+        end
+    end
+    
+    -- Store original weight
     if not originalWeights[id] then
-        originalWeights[id] = {}
+        originalWeights[id] = currentWeight
     end
     
-    -- If we found existing weight, use it
-    if weightFound and originalWeight then
-        if not originalWeights[id]["Weight"] then
-            originalWeights[id]["Weight"] = originalWeight
-        end
-        local newWeight = originalWeights[id]["Weight"] * WEIGHT_MULTIPLIER
-        petModel:SetAttribute("Weight", newWeight)
-        print("[TOCHIPYRO] Increased weight from", originalWeight, "to", newWeight, "kg")
-    else
-        -- If no weight found, check common default values based on pet type/rarity
-        local baseWeight = 2.5 -- Default base weight in kg (Normal pet range)
-        
-        -- Try to determine pet rarity/type for more realistic base weight
-        local petName = petModel.Name:lower()
-        if string.find(petName, "huge") or string.find(petName, "giant") then
-            baseWeight = 6.0 -- Huge pet range
-        elseif string.find(petName, "titanic") then
-            baseWeight = 8.5 -- Titanic pet range  
-        elseif string.find(petName, "godly") then
-            baseWeight = 9.5 -- Godly pet range
-        elseif string.find(petName, "small") or string.find(petName, "tiny") then
-            baseWeight = 0.7 -- Small pet range
-        end
-        
-        originalWeights[id]["Weight"] = baseWeight
-        local newWeight = baseWeight * WEIGHT_MULTIPLIER
-        
-        petModel:SetAttribute("Weight", newWeight)
-        print("[TOCHIPYRO] Created Weight attribute:", newWeight, "kg (base:", baseWeight, "kg)")
-    end
+    -- Calculate new weight
+    local newWeight = originalWeights[id] * WEIGHT_MULTIPLIER
     
-    -- Try to update GUI elements immediately
-    task.spawn(function()
-        for i = 1, 5 do -- Try multiple times in case GUI loads later
-            updateWeightGUI(petModel)
-            task.wait(0.5)
-        end
-    end)
+    -- Set the new weight in various places
+    petModel:SetAttribute("Weight", newWeight)
+    petModel:SetAttribute("weight", newWeight)
+    
+    -- Create or update weight value objects
+    local weightValue = petModel:FindFirstChild("Weight") or Instance.new("NumberValue")
+    weightValue.Name = "Weight"
+    weightValue.Value = newWeight
+    weightValue.Parent = petModel
+    
+    print("[TOCHIPYRO] Weight increased from", currentWeight, "kg to", newWeight, "kg")
+    
+    -- Force update any GUI that might be showing this
+    updateAllWeightDisplays(newWeight, petModel.Name)
 end
 
--- Function to update weight display in GUI elements
-local function updateWeightGUI(petModel)
-    if not petModel then return end
+-- Function to update weight displays in GUI
+function updateAllWeightDisplays(newWeight, petName)
+    local playerGui = LocalPlayer.PlayerGui
     
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if not playerGui then return end
-    
-    local newWeight = petModel:GetAttribute("Weight") or petModel:GetAttribute("weight")
-    if not newWeight then return end
-    
-    -- Search for pet viewing GUI (the "View" dialog that shows pet stats)
-    local function searchAndUpdateGUI(parent)
-        for _, gui in ipairs(parent:GetDescendants()) do
-            if gui:IsA("TextLabel") or gui:IsA("TextBox") then
-                local text = gui.Text
+    -- Search through all GUI elements
+    for _, gui in ipairs(playerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") or gui:IsA("TextBox") then
+            local text = gui.Text
+            
+            -- Check if this text contains weight information
+            if string.find(text, "kg") or string.find(text:lower(), "weight") then
                 
-                -- Look for weight-related text patterns
-                if string.find(text:lower(), "weight") or 
-                   string.match(text, "%d+%.?%d*%s*kg") or
-                   string.match(text, "weight:%s*%d+%.?%d*") then
-                    
-                    -- Update the weight value in the text
-                    local updatedText = string.gsub(text, "(%d+%.?%d*)(%s*kg)", string.format("%.1f", newWeight) .. "%2")
-                    updatedText = string.gsub(updatedText, "(weight:%s*)(%d+%.?%d*)", "%1" .. string.format("%.1f", newWeight))
-                    updatedText = string.gsub(updatedText, "(%d+%.?%d*)(%s*KG)", string.format("%.1f", newWeight) .. "%2")
-                    
-                    if updatedText ~= text then
-                        gui.Text = updatedText
-                        print("[TOCHIPYRO] Updated weight display:", updatedText)
+                -- Try different patterns to update weight
+                local patterns = {
+                    "(%d+%.?%d*)%s*kg", -- "5.2 kg"
+                    "(%d+%.?%d*)%s*KG", -- "5.2 KG" 
+                    "weight:%s*(%d+%.?%d*)", -- "Weight: 5.2"
+                    "weight%s*(%d+%.?%d*)", -- "Weight 5.2"
+                }
+                
+                for _, pattern in ipairs(patterns) do
+                    if string.match(text, pattern) then
+                        local newText = string.gsub(text, pattern, string.format("%.1f", newWeight))
+                        if newText ~= text then
+                            gui.Text = newText
+                            print("[TOCHIPYRO] Updated GUI weight display:", newText)
+                        end
                     end
                 end
                 
-                -- Also check for standalone number + kg pattern
-                if string.match(text, "^%d+%.?%d*%s*[Kk][Gg]$") then
+                -- Also try to replace any standalone kg values
+                if string.match(text, "^%d+%.?%d*%s*kg$") then
                     gui.Text = string.format("%.1f kg", newWeight)
                     print("[TOCHIPYRO] Updated standalone weight:", gui.Text)
                 end
@@ -133,59 +123,37 @@ local function updateWeightGUI(petModel)
         end
     end
     
-    -- Search in PlayerGui for pet view dialogs
-    searchAndUpdateGUI(playerGui)
-    
-    -- Also search in StarterGui in case some elements are there
-    local starterGui = game:GetService("StarterGui")
-    if starterGui then
-        searchAndUpdateGUI(starterGui)
-    end
-    
-    -- Search in the pet model itself for any attached GUIs
-    searchAndUpdateGUI(petModel)
-end
-
--- Add a continuous GUI monitor for weight updates
-local function startWeightGUIMonitor(petModel)
-    local id = getPetUniqueId(petModel)
-    if not id then return end
-    
+    -- Also try to update any pet info panels that might be open
     task.spawn(function()
-        while petModel and petModel.Parent and enlargedPetIds[id] do
-            updateWeightGUI(petModel)
-            task.wait(1) -- Check every second
+        for i = 1, 10 do
+            task.wait(0.2)
+            for _, gui in ipairs(playerGui:GetDescendants()) do
+                if gui:IsA("TextLabel") and gui.Visible then
+                    local text = gui.Text
+                    if string.find(text, "kg") and (string.find(text, petName) or string.find(gui.Parent.Name, "Pet") or string.find(gui.Parent.Name, "Info")) then
+                        local newText = string.gsub(text, "%d+%.?%d*", string.format("%.1f", newWeight))
+                        if newText ~= text then
+                            gui.Text = newText
+                            print("[TOCHIPYRO] Updated pet info weight:", newText)
+                        end
+                    end
+                end
+            end
         end
     end)
 end
-local function restoreOriginalWeight(petModel)
-    if not petModel then return end
-    
-    local id = getPetUniqueId(petModel)
-    if not id or not originalWeights[id] then return end
-    
-    -- Restore all original weight attributes
-    for attrName, originalValue in pairs(originalWeights[id]) do
-        petModel:SetAttribute(attrName, originalValue)
-    end
-    
-    updateWeightGUI(petModel)
-    print("[TOCHIPYRO] Restored original weight for pet:", petModel.Name)
-end
+
+-- Rainbow color helper
 local function rainbowColor(t)
     local hue = (tick() * 0.5 + t) % 1
     return Color3.fromHSV(hue, 1, 1)
 end
 
--- Enhanced scaling function with better joint handling
+-- Scale model parts & joints preserving proportions
 local function scaleModelWithJoints(model, scaleFactor)
-    if not model or not model.Parent then return end
-    
-    -- Scale all parts and meshes
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Size = obj.Size * scaleFactor
-            -- Force network ownership for better replication
             if obj.CanSetNetworkOwnership then
                 pcall(function()
                     obj:SetNetworkOwner(LocalPlayer)
@@ -193,25 +161,9 @@ local function scaleModelWithJoints(model, scaleFactor)
             end
         elseif obj:IsA("SpecialMesh") then
             obj.Scale = obj.Scale * scaleFactor
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            -- Preserve texture scaling
-            if obj.StudsPerTileU then
-                obj.StudsPerTileU = obj.StudsPerTileU * scaleFactor
-                obj.StudsPerTileV = obj.StudsPerTileV * scaleFactor
-            end
-        elseif obj:IsA("Motor6D") or obj:IsA("Weld") or obj:IsA("WeldConstraint") then
-            -- Better joint scaling
-            if obj:IsA("Motor6D") then
-                local c0Pos = obj.C0.Position * scaleFactor
-                local c1Pos = obj.C1.Position * scaleFactor
-                obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
-                obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
-            elseif obj:IsA("Weld") then
-                local c0Pos = obj.C0.Position * scaleFactor
-                local c1Pos = obj.C1.Position * scaleFactor
-                obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
-                obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
-            end
+        elseif obj:IsA("Motor6D") then
+            obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
+            obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
         end
     end
     
@@ -219,25 +171,14 @@ local function scaleModelWithJoints(model, scaleFactor)
     model:SetAttribute("TOCHIPYRO_Enlarged", true)
     model:SetAttribute("TOCHIPYRO_Scale", scaleFactor)
     
-    -- Also increase the weight
-    increasePetWeight(model)
+    -- Also increase the weight display
+    increaseWeightDisplay(model)
 end
 
--- Get unique pet ID with better fallbacks
-local function getPetUniqueId(petModel)
+-- Get unique pet ID or fallback to name
+function getPetUniqueId(petModel)
     if not petModel then return nil end
-    
-    -- Try multiple attribute methods
-    local id = petModel:GetAttribute("PetID") or 
-               petModel:GetAttribute("UniqueID") or
-               petModel:GetAttribute("OwnerUserId") or
-               petModel:GetAttribute("PetGUID")
-    
-    if id then return tostring(id) end
-    
-    -- Fallback to name + some unique identifier
-    local owner = petModel:GetAttribute("Owner") or LocalPlayer.Name
-    return petModel.Name .. "_" .. owner
+    return petModel:GetAttribute("PetID") or petModel:GetAttribute("OwnerUserId") or petModel.Name
 end
 
 -- Track pet ID to keep it enlarged persistently
@@ -245,7 +186,6 @@ local function markPetAsEnlarged(pet)
     local id = getPetUniqueId(pet)
     if id then
         enlargedPetIds[id] = true
-        print("[TOCHIPYRO] Marked pet for persistent enlargement:", id)
     end
 end
 
@@ -254,12 +194,10 @@ local function startPetMonitoring(pet)
     local id = getPetUniqueId(pet)
     if not id then return end
     
-    -- Stop existing monitoring for this pet
     if petUpdateLoops[id] then
         petUpdateLoops[id]:Disconnect()
     end
     
-    -- Start new monitoring loop
     petUpdateLoops[id] = RunService.Heartbeat:Connect(function()
         if not pet or not pet.Parent then
             petUpdateLoops[id]:Disconnect()
@@ -267,11 +205,9 @@ local function startPetMonitoring(pet)
             return
         end
         
-        -- Check if pet needs re-enlargement
         if enlargedPetIds[id] and not pet:GetAttribute("TOCHIPYRO_Enlarged") then
-            task.wait(0.1) -- Small delay to ensure stability
+            task.wait(0.1)
             scaleModelWithJoints(pet, ENLARGE_SCALE)
-            increasePetWeight(pet) -- Also re-apply weight increase
             print("[TOCHIPYRO] Re-applied enlargement to pet:", pet.Name)
         end
     end)
@@ -281,26 +217,21 @@ end
 local function onPetAdded(pet)
     if not pet:IsA("Model") then return end
     
-    -- Wait a moment for the pet to fully load
     task.wait(0.2)
     
     local id = getPetUniqueId(pet)
     if not id then return end
     
-    -- Start monitoring this pet
     startPetMonitoring(pet)
     
-    -- If this pet should be enlarged, do it
     if enlargedPetIds[id] then
         task.wait(0.1)
         scaleModelWithJoints(pet, ENLARGE_SCALE)
         print("[TOCHIPYRO] Auto-enlarged pet on spawn:", pet.Name)
     end
     
-    -- Monitor for when pet gets removed/moved
     pet.AncestryChanged:Connect(function()
         if pet.Parent then
-            -- Pet moved to new container, re-monitor
             task.wait(0.1)
             if enlargedPetIds[id] then
                 scaleModelWithJoints(pet, ENLARGE_SCALE)
@@ -309,53 +240,46 @@ local function onPetAdded(pet)
     end)
 end
 
--- Enhanced container monitoring
-local function setupContainerMonitoring()
-    for _, container in ipairs(petContainers) do
-        if container then
-            container.ChildAdded:Connect(onPetAdded)
-            container.DescendantAdded:Connect(function(descendant)
-                if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
-                    onPetAdded(descendant)
-                end
-            end)
-        end
-    end
-    
-    -- Also monitor player's character for pet equipping
-    local function setupCharacterMonitoring()
-        if LocalPlayer.Character then
-            LocalPlayer.Character.ChildAdded:Connect(onPetAdded)
-            LocalPlayer.Character.DescendantAdded:Connect(function(descendant)
-                if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
-                    onPetAdded(descendant)
-                end
-            end)
-        end
-    end
-    
-    LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
-    if LocalPlayer.Character then
-        setupCharacterMonitoring()
+-- Setup container monitoring
+for _, container in ipairs(petContainers) do
+    if container then
+        container.ChildAdded:Connect(onPetAdded)
+        container.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
+                onPetAdded(descendant)
+            end
+        end)
     end
 end
 
--- Setup container monitoring
-setupContainerMonitoring()
+-- Monitor player's character
+local function setupCharacterMonitoring()
+    if LocalPlayer.Character then
+        LocalPlayer.Character.ChildAdded:Connect(onPetAdded)
+        LocalPlayer.Character.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
+                onPetAdded(descendant)
+            end
+        end)
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
+if LocalPlayer.Character then
+    setupCharacterMonitoring()
+end
 
 -- Find the currently held/equipped pet model
 local function getHeldPet()
     local char = LocalPlayer.Character
     if not char then return nil end
     
-    -- Check character for pet models
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") and not obj:FindFirstChildOfClass("Humanoid") and obj ~= char then
             return obj
         end
     end
     
-    -- Check garden slots if available
     local gardenSlots = workspace:FindFirstChild("GardenSlots")
     if gardenSlots then
         for _, slot in ipairs(gardenSlots:GetChildren()) do
@@ -378,7 +302,6 @@ local function enlargeCurrentHeldPet()
         markPetAsEnlarged(pet)
         startPetMonitoring(pet)
         
-        -- Force a small position change to trigger replication
         if pet.PrimaryPart then
             local originalCFrame = pet.PrimaryPart.CFrame
             pet.PrimaryPart.CFrame = originalCFrame + Vector3.new(0, 0.01, 0)
@@ -388,7 +311,6 @@ local function enlargeCurrentHeldPet()
         
         print("[TOCHIPYRO] Enlarged pet:", pet.Name)
     else
-        -- Try to find pets in other locations
         local foundPet = false
         for _, container in ipairs(petContainers) do
             if container then
@@ -415,8 +337,7 @@ local function enlargeCurrentHeldPet()
     end
 end
 
--- GUI Creation (keeping original design)
-
+-- GUI Creation
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TOCHIPYRO_Script"
 ScreenGui.Parent = game.CoreGui
@@ -449,7 +370,7 @@ SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 55)
 SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SizeButton.TextColor3 = Color3.new(1, 1, 1)
-SizeButton.Text = "Size Enlarge"
+SizeButton.Text = "Size Enlarge + Weight"
 SizeButton.Font = Enum.Font.GothamBold
 SizeButton.TextScaled = true
 SizeButton.Parent = MainFrame
@@ -482,32 +403,20 @@ BypassButton.Size = UDim2.new(1, -20, 0, 40)
 BypassButton.Position = UDim2.new(0, 10, 0, 10)
 BypassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 BypassButton.TextColor3 = Color3.new(1, 1, 1)
-BypassButton.Text = "Bypass"
+BypassButton.Text = "Update All Weights"
 BypassButton.Font = Enum.Font.GothamBold
 BypassButton.TextScaled = true
 BypassButton.Parent = MoreFrame
 
-local RestoreButton = Instance.new("TextButton")
-RestoreButton.Size = UDim2.new(1, -20, 0, 40)
-RestoreButton.Position = UDim2.new(0, 10, 0, 105)
-RestoreButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-RestoreButton.TextColor3 = Color3.new(1, 1, 1)
-RestoreButton.Text = "Restore Weight"
-RestoreButton.Font = Enum.Font.GothamBold
-RestoreButton.TextScaled = true
-RestoreButton.Parent = MoreFrame
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 105)
+CloseButton.Position = UDim2.new(0, 10, 0, 65)
 CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 CloseButton.TextColor3 = Color3.new(1, 1, 1)
 CloseButton.Text = "Close UI"
 CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextScaled = true
 CloseButton.Parent = MoreFrame
-
--- Adjust MoreFrame size to fit new button
-MoreFrame.Size = UDim2.new(0, 210, 0, 200)
 
 -- Button Events
 SizeButton.MouseButton1Click:Connect(enlargeCurrentHeldPet)
@@ -516,26 +425,21 @@ MoreButton.MouseButton1Click:Connect(function()
     MoreFrame.Visible = not MoreFrame.Visible
 end)
 
-RestoreButton.MouseButton1Click:Connect(function()
+BypassButton.MouseButton1Click:Connect(function()
+    -- Force update all weight displays
     local pet = getHeldPet()
     if pet then
-        restoreOriginalWeight(pet)
-        print("[TOCHIPYRO] Weight restored for current pet")
-    else
-        warn("[TOCHIPYRO] No pet found to restore weight")
+        local weight = pet:GetAttribute("Weight") or 25.0
+        updateAllWeightDisplays(weight, pet.Name)
+        print("[TOCHIPYRO] Forced weight display update")
     end
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
-    -- Clean up monitoring loops
     for id, connection in pairs(petUpdateLoops) do
         connection:Disconnect()
     end
     ScreenGui:Destroy()
 end)
 
-BypassButton.MouseButton1Click:Connect(function()
-    print("[TOCHIPYRO] Bypass pressed (placeholder).")
-end)
-
-print("[TOCHIPYRO] Enhanced pet enlarger loaded with improved visibility and persistence!")
+print("[TOCHIPYRO] Pet enlarger with weight display loaded!")
