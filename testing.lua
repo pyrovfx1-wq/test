@@ -12,22 +12,52 @@ local function rainbowColor(t)
     return Color3.fromHSV(hue, 1, 1)
 end
 
--- Simple scaling function
+-- Simple scaling function with weight effects
 local function scaleModel(model, scaleFactor)
     if not model or not model.Parent then return end
     
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Size = obj.Size * scaleFactor
+            
+            -- Add weight effect - increase mass
+            obj.CustomPhysicalProperties = PhysicalProperties.new(
+                0.7 * scaleFactor, -- Density (heavier)
+                0.5, -- Friction  
+                0, -- Elasticity
+                1, -- ElasticityWeight
+                1  -- FrictionWeight
+            )
+            
         elseif obj:IsA("SpecialMesh") then
             obj.Scale = obj.Scale * scaleFactor
+            
         elseif obj:IsA("Motor6D") then
             obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
             obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
+            
+        elseif obj:IsA("Humanoid") then
+            -- Make pet move slower (heavier feel)
+            obj.WalkSpeed = obj.WalkSpeed * 0.6 -- 40% slower
+            obj.JumpPower = obj.JumpPower * 0.7 -- 30% less jump
         end
     end
     
-    print("[TOCHIPYRO] Enlarged pet:", model.Name)
+    -- Add heavy step sound effect
+    task.spawn(function()
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxasset://sounds/impact_wood.ogg"
+        sound.Volume = 0.3
+        sound.Pitch = 0.8
+        sound.Parent = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        
+        if sound.Parent then
+            sound:Play()
+            game:GetService("Debris"):AddItem(sound, 2)
+        end
+    end)
+    
+    print("[TOCHIPYRO] Enlarged pet with weight effects:", model.Name)
 end
 
 -- Find pet in character
@@ -88,7 +118,7 @@ SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 55)
 SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SizeButton.TextColor3 = Color3.new(1, 1, 1)
-SizeButton.Text = "Size Enlarge"
+SizeButton.Text = "Size Enlarge + Weight"
 SizeButton.Font = Enum.Font.GothamBold
 SizeButton.TextScaled = true
 SizeButton.Parent = MainFrame
