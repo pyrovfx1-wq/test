@@ -1,144 +1,137 @@
--- TOCHIPYRO Script (Grow a Garden - Held Pet Auto Detect)
--- UI Setup
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TOCHIPYRO"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-ScreenGui.BackgroundTransparency = 1
+-- TOCHIPYRO: quick debug probe (paste into executor)
+pcall(function()
+    print("=== TOCHIPYRO DEBUG START ===")
 
--- Main Frame
-local Frame = Instance.new("Frame")
-Frame.Parent = ScreenGui
-Frame.Size = UDim2.new(0, 300, 0, 200)
-Frame.Position = UDim2.new(0.5, -150, 0.5, -100)
-Frame.BackgroundTransparency = 0.5
-Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-Frame.BorderSizePixel = 0
+    local Players = game:GetService("Players")
+    local LocalPlayer = Players.LocalPlayer
+    print("LocalPlayer:", LocalPlayer and LocalPlayer.Name or "nil")
 
--- Rainbow Title
-local Title = Instance.new("TextLabel")
-Title.Parent = Frame
-Title.Size = UDim2.new(1, 0, 0, 40)
-Title.BackgroundTransparency = 1
-Title.Font = Enum.Font.SourceSansBold
-Title.TextScaled = true
-Title.Text = "TOCHIPYRO Script"
-Title.TextColor3 = Color3.new(1, 0, 0)
+    local placeIdOk, placeId = pcall(function() return game.PlaceId end)
+    print("PlaceId:", placeIdOk and placeId or "error")
 
--- Rainbow effect loop
-task.spawn(function()
-    local t = 0
-    while task.wait(0.05) do
-        Title.TextColor3 = Color3.fromHSV(t % 1, 1, 1)
-        t += 0.01
+    -- Try make a tiny visual indicator (PlayerGui preferred, fallback CoreGui)
+    local guiParent = nil
+    if LocalPlayer then
+        guiParent = LocalPlayer:FindFirstChild("PlayerGui")
     end
-end)
+    if not guiParent then
+        guiParent = game.CoreGui
+    end
+    pcall(function()
+        local s = Instance.new("ScreenGui")
+        s.Name = "TOCHIPYRO_DEBUG_GUI"
+        s.ResetOnSpawn = false
+        s.Parent = guiParent
+        local t = Instance.new("TextLabel", s)
+        t.Size = UDim2.new(0,200,0,30)
+        t.Position = UDim2.new(0,10,0,10)
+        t.Text = "TOCHIPYRO DEBUG RUNNING"
+        t.TextScaled = true
+        t.BackgroundTransparency = 0.6
+        t.TextColor3 = Color3.fromRGB(255,255,255)
+        delay(6, function() pcall(function() s:Destroy() end) end)
+    end)
 
--- Size Enlarge button
-local SizeButton = Instance.new("TextButton")
-SizeButton.Parent = Frame
-SizeButton.Size = UDim2.new(1, -20, 0, 40)
-SizeButton.Position = UDim2.new(0, 10, 0, 50)
-SizeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-SizeButton.Text = "Size Enlarge"
-SizeButton.TextScaled = true
-SizeButton.Font = Enum.Font.SourceSansBold
-SizeButton.TextColor3 = Color3.new(1, 1, 1)
-SizeButton.BackgroundTransparency = 0.2
+    if not LocalPlayer then
+        print("No LocalPlayer found. Are you running this on the client/executor?")
+        return
+    end
 
--- "More" button
-local MoreButton = Instance.new("TextButton")
-MoreButton.Parent = Frame
-MoreButton.Size = UDim2.new(1, -20, 0, 40)
-MoreButton.Position = UDim2.new(0, 10, 0, 100)
-MoreButton.BackgroundColor3 = Color3.fromRGB(100, 50, 150)
-MoreButton.Text = "More"
-MoreButton.TextScaled = true
-MoreButton.Font = Enum.Font.SourceSansBold
-MoreButton.TextColor3 = Color3.new(1, 1, 1)
-MoreButton.BackgroundTransparency = 0.2
+    local char = LocalPlayer.Character
+    print("Character present:", char ~= nil)
+    if not char then
+        print("Character nil. Wait a few seconds then rerun the script.")
+        return
+    end
 
--- More UI
-local MoreFrame = Instance.new("Frame")
-MoreFrame.Parent = ScreenGui
-MoreFrame.Size = UDim2.new(0, 200, 0, 150)
-MoreFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
-MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
-MoreFrame.BackgroundTransparency = 0.5
-MoreFrame.Visible = false
-MoreFrame.BorderSizePixel = 0
+    -- list top-level children of Character
+    print("\n-- Character children --")
+    for _, c in ipairs(char:GetChildren()) do
+        print(string.format("  %s  |  %s", c.Name, c.ClassName))
+    end
 
-local Glow = Instance.new("UIStroke")
-Glow.Parent = MoreFrame
-Glow.Thickness = 3
-Glow.Color = Color3.fromRGB(200, 100, 255)
-
--- Bypass button
-local BypassButton = Instance.new("TextButton")
-BypassButton.Parent = MoreFrame
-BypassButton.Size = UDim2.new(1, -20, 0, 40)
-BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-BypassButton.Text = "Bypass"
-BypassButton.TextScaled = true
-BypassButton.Font = Enum.Font.SourceSansBold
-BypassButton.TextColor3 = Color3.new(1, 1, 1)
-
--- Close UI button
-local CloseButton = Instance.new("TextButton")
-CloseButton.Parent = MoreFrame
-CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-CloseButton.Text = "Close UI"
-CloseButton.TextScaled = true
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.TextColor3 = Color3.new(1, 1, 1)
-
--- More button toggle
-MoreButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = not MoreFrame.Visible
-end)
-
--- Close button
-CloseButton.MouseButton1Click:Connect(function()
-    ScreenGui:Destroy()
-end)
-
--- Scale settings
-local SCALE = 1.75
-
--- Function to find held pet by weld
-local function getHeldPet()
-    local char = game.Players.LocalPlayer.Character
-    if not char then return nil end
-    for _, obj in ipairs(char:GetDescendants()) do
-        if obj:IsA("Weld") or obj:IsA("Motor6D") then
-            if obj.Part1 and obj.Part1.Parent and obj.Part1.Parent:IsA("Model") then
-                local model = obj.Part1.Parent
-                -- Skip player tools
-                if not model:FindFirstChildOfClass("Humanoid") and model ~= char then
-                    return model
+    -- check for Tools and list contents
+    print("\n-- Tools / Accessories in Character --")
+    for _, v in ipairs(char:GetChildren()) do
+        if v:IsA("Tool") or v:IsA("Accessory") then
+            print(" TOOL/ACCESSORY:", v:GetFullName(), v.ClassName)
+            for _, d in ipairs(v:GetDescendants()) do
+                if d:IsA("BasePart") or d:IsA("MeshPart") or d:IsA("SpecialMesh") or d:IsA("Attachment") then
+                    print("    ->", d.ClassName, d:GetFullName())
                 end
             end
         end
     end
-    return nil
-end
 
--- Size enlarge logic
-SizeButton.MouseButton1Click:Connect(function()
-    local pet = getHeldPet()
-    if pet then
-        for _, part in ipairs(pet:GetDescendants()) do
-            if part:IsA("MeshPart") then
-                part.Size = part.Size * SCALE
-            elseif part:IsA("SpecialMesh") then
-                part.Scale = part.Scale * SCALE
+    -- print equipped tool (if any)
+    local equipped = char:FindFirstChildOfClass("Tool")
+    print("\nEquipped tool:", equipped and equipped.Name or "none")
+
+    -- List welds / weldconstraints / motor6D in workspace that reference Character
+    print("\n-- Constraints in workspace referencing your Character --")
+    local count = 0
+    for _, d in ipairs(workspace:GetDescendants()) do
+        if d:IsA("Weld") or d:IsA("WeldConstraint") or d:IsA("Motor6D") then
+            local p0Name = (d.Part0 and d.Part0:GetFullName()) or "nil"
+            local p1Name = (d.Part1 and d.Part1:GetFullName()) or "nil"
+            local referencesChar = (d.Part0 and d.Part0:IsDescendantOf(char)) or (d.Part1 and d.Part1:IsDescendantOf(char))
+            if referencesChar then
+                count = count + 1
+                print(string.format("  [%d] %s  | part0=%s | part1=%s | referencesChar=%s", count, d:GetFullName(), p0Name, p1Name, tostring(referencesChar)))
             end
         end
-        print("Enlarged held pet:", pet.Name)
-    else
-        warn("No held pet found.")
     end
+    if count == 0 then print("  (none found pointing to your Character)") end
+
+    -- List models in workspace that have an Owner ObjectValue or Owner attribute matching you
+    print("\n-- Models with Owner object/attribute --")
+    local ownerCount = 0
+    for _, m in ipairs(workspace:GetDescendants()) do
+        if m:IsA("Model") then
+            local ownerObj = m:FindFirstChild("Owner")
+            local ownerAttr = nil
+            if m.GetAttribute then
+                ownerAttr = m:GetAttribute("Owner") or m:GetAttribute("OwnerUserId") or m:GetAttribute("owner")
+            end
+            local match = false
+            if ownerObj and ownerObj.Value == LocalPlayer then match = true end
+            if ownerAttr and (tostring(ownerAttr) == tostring(LocalPlayer.UserId) or tostring(ownerAttr) == LocalPlayer.Name) then match = true end
+            if match then
+                ownerCount = ownerCount + 1
+                print(" ", ownerCount, m:GetFullName(), "ownerObj=", tostring(ownerObj), "ownerAttr=", tostring(ownerAttr))
+            end
+        end
+    end
+    if ownerCount == 0 then print("  (no Owner matches found)") end
+
+    -- list nearby models (basic heuristic)
+    local hrp = char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso")
+    if hrp then
+        print("\n-- Nearby Models (within 12 studs) --")
+        local nearCount = 0
+        for _, m in ipairs(workspace:GetChildren()) do
+            if m:IsA("Model") and not m:IsDescendantOf(char) then
+                local base = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+                if base then
+                    local dist = (base.Position - hrp.Position).Magnitude
+                    if dist <= 12 then
+                        nearCount = nearCount + 1
+                        local meshInfo = {}
+                        for _, d in ipairs(m:GetDescendants()) do
+                            if d:IsA("MeshPart") then table.insert(meshInfo, "MeshPart:"..d.Name) end
+                            if d:IsA("SpecialMesh") then table.insert(meshInfo, "SpecialMesh:"..d.Name) end
+                        end
+                        print(string.format("  [%d] %s dist=%.2f meshes=%s", nearCount, m:GetFullName(), dist, table.concat(meshInfo,",") ))
+                    end
+                end
+            end
+        end
+        if nearCount == 0 then print("  (no nearby models with meshes within 12 studs)") end
+    else
+        print("No HRP found; cannot list nearby models.")
+    end
+
+    -- Print a short message on how to proceed
+    print("\n=== DEBUG COMPLETE ===")
+    print("If the UI didn't appear or nothing printed, try running: print('hello from executor') to confirm the executor is executing client code.")
 end)
