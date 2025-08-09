@@ -1,137 +1,151 @@
--- TOCHIPYRO Script for Grow a Garden
+--[[  
+   TOCHIPYRO Script for Grow a Garden  
+   Features:
+   - Rainbow Title
+   - Size Enlarge (Pets only, proportional & joint-preserving)
+   - More Menu (Bypass + Close)
+   - Works with all pet types in Grow a Garden
+--]]
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
--- Function to create rainbow color
+-- Rainbow color function
 local function rainbowColor(t)
-    local r = math.sin(t*2) * 127 + 128
-    local g = math.sin(t*2 + 2) * 127 + 128
-    local b = math.sin(t*2 + 4) * 127 + 128
-    return Color3.fromRGB(r, g, b)
+    local hue = (tick() * 0.5 + t) % 1
+    return Color3.fromHSV(hue, 1, 1)
 end
 
--- Find held pet
+-- Universal pet detection
 local function getHeldPet()
     local char = LocalPlayer.Character
     if not char then return nil end
-
     for _, obj in ipairs(char:GetDescendants()) do
-        if obj:IsA("Model") and not obj:FindFirstChildOfClass("Humanoid") then
-            local nameLower = string.lower(obj.Name)
-            if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich") or nameLower:find("fox") then
-                return obj
+        if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") then
+            if not obj:FindFirstChildOfClass("Humanoid") and not obj:IsDescendantOf(LocalPlayer.Character:FindFirstChildWhichIsA("Tool") or Instance.new("Folder")) then
+                local partCount = 0
+                for _, p in ipairs(obj:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        partCount += 1
+                    end
+                end
+                if partCount >= 3 then
+                    return obj
+                end
             end
         end
     end
     return nil
 end
 
--- Scale pet naturally (preserve joints)
+-- Natural pet scaling
 local function scaleModelWithJoints(model, scaleFactor)
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Size = part.Size * scaleFactor
-        elseif part:IsA("SpecialMesh") then
-            part.Scale = part.Scale * scaleFactor
-        elseif part:IsA("Motor6D") then
-            local c0Pos, c0Rot = part.C0.Position, part.C0 - part.C0.Position
-            local c1Pos, c1Rot = part.C1.Position, part.C1 - part.C1.Position
-            part.C0 = CFrame.new(c0Pos * scaleFactor) * c0Rot
-            part.C1 = CFrame.new(c1Pos * scaleFactor) * c1Rot
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            obj.Size = obj.Size * scaleFactor
+        elseif obj:IsA("SpecialMesh") then
+            obj.Scale = obj.Scale * scaleFactor
+        elseif obj:IsA("Motor6D") then
+            obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
+            obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
         end
     end
 end
 
--- GUI creation
-local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 300, 0, 200)
-MainFrame.Position = UDim2.new(0.3, 0, 0.3, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+-- GUI Setup
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = game.CoreGui
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 250, 0, 200)
+MainFrame.Position = UDim2.new(0.5, -125, 0.5, -100)
+MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 MainFrame.BackgroundTransparency = 0.5
 MainFrame.BorderSizePixel = 0
+MainFrame.Parent = ScreenGui
 
--- Rainbow title
-local Title = Instance.new("TextLabel", MainFrame)
+-- Rainbow Title
+local Title = Instance.new("TextLabel")
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundTransparency = 1
-Title.Text = "TOCHIPYRO Script"
 Title.Font = Enum.Font.SourceSansBold
-Title.TextScaled = true
-
--- Animate rainbow
-spawn(function()
-    local t = 0
-    while true do
-        Title.TextColor3 = rainbowColor(t)
-        t = t + 0.05
-        task.wait(0.05)
-    end
-end)
+Title.Text = "TOCHIPYRO Script"
+Title.TextSize = 24
+Title.Parent = MainFrame
 
 -- Size Enlarge Button
-local SizeButton = Instance.new("TextButton", MainFrame)
+local SizeButton = Instance.new("TextButton")
 SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 50)
+SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SizeButton.TextColor3 = Color3.new(1, 1, 1)
 SizeButton.Text = "Size Enlarge"
-SizeButton.Font = Enum.Font.SourceSansBold
-SizeButton.TextScaled = true
-SizeButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+SizeButton.Parent = MainFrame
+
+-- More Button
+local MoreButton = Instance.new("TextButton")
+MoreButton.Size = UDim2.new(1, -20, 0, 40)
+MoreButton.Position = UDim2.new(0, 10, 0, 100)
+MoreButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+MoreButton.TextColor3 = Color3.new(1, 1, 1)
+MoreButton.Text = "More"
+MoreButton.Parent = MainFrame
+
+-- More Menu
+local MoreFrame = Instance.new("Frame")
+MoreFrame.Size = UDim2.new(0, 200, 0, 150)
+MoreFrame.Position = UDim2.new(0.5, -100, 0.5, -75)
+MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+MoreFrame.BackgroundTransparency = 0.5
+MoreFrame.Visible = false
+MoreFrame.Parent = ScreenGui
+
+-- Glow effect (UIStroke)
+local UIStroke = Instance.new("UIStroke")
+UIStroke.Thickness = 2
+UIStroke.Color = Color3.fromRGB(200, 0, 200)
+UIStroke.Parent = MoreFrame
+
+-- Bypass Button
+local BypassButton = Instance.new("TextButton")
+BypassButton.Size = UDim2.new(1, -20, 0, 40)
+BypassButton.Position = UDim2.new(0, 10, 0, 10)
+BypassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+BypassButton.TextColor3 = Color3.new(1, 1, 1)
+BypassButton.Text = "Bypass"
+BypassButton.Parent = MoreFrame
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(1, -20, 0, 40)
+CloseButton.Position = UDim2.new(0, 10, 0, 60)
+CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CloseButton.TextColor3 = Color3.new(1, 1, 1)
+CloseButton.Text = "Close UI"
+CloseButton.Parent = MoreFrame
+
+-- Button Logic
 SizeButton.MouseButton1Click:Connect(function()
     local pet = getHeldPet()
     if pet then
-        scaleModelWithJoints(pet, 1.75) -- 75% bigger
-        print("Pet enlarged naturally:", pet.Name)
+        scaleModelWithJoints(pet, 1.75)
+        print("Pet enlarged:", pet.Name)
     else
         warn("No held pet found.")
     end
 end)
 
--- More Button
-local MoreButton = Instance.new("TextButton", MainFrame)
-MoreButton.Size = UDim2.new(1, -20, 0, 40)
-MoreButton.Position = UDim2.new(0, 10, 0, 100)
-MoreButton.Text = "More"
-MoreButton.Font = Enum.Font.SourceSansBold
-MoreButton.TextScaled = true
-MoreButton.BackgroundColor3 = Color3.fromRGB(255, 100, 255)
-
--- Secondary UI
-local MoreFrame = Instance.new("Frame", ScreenGui)
-MoreFrame.Size = UDim2.new(0, 250, 0, 150)
-MoreFrame.Position = UDim2.new(0.35, 0, 0.35, 0)
-MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
-MoreFrame.BackgroundTransparency = 0.5
-MoreFrame.Visible = false
-MoreFrame.BorderSizePixel = 0
-
--- Glow effect
-local Glow = Instance.new("UIStroke", MoreFrame)
-Glow.Color = Color3.fromRGB(255, 0, 255)
-Glow.Thickness = 3
-
--- Bypass button
-local BypassButton = Instance.new("TextButton", MoreFrame)
-BypassButton.Size = UDim2.new(1, -20, 0, 40)
-BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.Text = "Bypass"
-BypassButton.Font = Enum.Font.SourceSansBold
-BypassButton.TextScaled = true
-BypassButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-
--- Close UI button
-local CloseButton = Instance.new("TextButton", MoreFrame)
-CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.Text = "Close UI"
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.TextScaled = true
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-CloseButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = false
+MoreButton.MouseButton1Click:Connect(function()
+    MoreFrame.Visible = not MoreFrame.Visible
 end)
 
--- More button opens secondary UI
-MoreButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = true
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Rainbow title update loop
+task.spawn(function()
+    while task.wait(0.1) do
+        Title.TextColor3 = rainbowColor(0)
+    end
 end)
