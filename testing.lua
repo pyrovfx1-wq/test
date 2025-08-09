@@ -3,7 +3,26 @@
     Works only in Grow a Garden
 ]]
 
-if game.PlaceId ~= 123456789 then -- Replace with Grow a Garden's actual PlaceId
+-- Detect current PlaceId
+local currentPlaceId = game.PlaceId
+
+-- Grow a Garden PlaceId(s) — add all IDs if the game has multiple
+local validPlaceIds = {
+    123456789, -- Replace with actual Grow a Garden main place
+    987654321  -- Example for additional maps/places
+}
+
+-- Check if PlaceId matches Grow a Garden
+local function isGrowAGarden()
+    for _, id in ipairs(validPlaceIds) do
+        if currentPlaceId == id then
+            return true
+        end
+    end
+    return false
+end
+
+if not isGrowAGarden() then
     warn("This script only works in Grow a Garden!")
     return
 end
@@ -52,16 +71,38 @@ EnlargeButton.Position = UDim2.new(0.1, 0, 0.5, 0)
 EnlargeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
 EnlargeButton.Parent = MainFrame
 
--- Enlarging pet visually only
+-- Smooth enlarge function
+local function smoothEnlarge(model, scaleMultiplier, duration)
+    if model:IsA("Model") and model.PrimaryPart then
+        local parts = {}
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("BasePart") then
+                table.insert(parts, {Part = part, Size = part.Size})
+            end
+        end
+        
+        local steps = 20
+        local stepTime = duration / steps
+        for i = 1, steps do
+            local progress = i / steps
+            for _, data in ipairs(parts) do
+                local targetSize = data.Size * scaleMultiplier
+                data.Part.Size = data.Size:Lerp(targetSize, progress)
+            end
+            task.wait(stepTime)
+        end
+    end
+end
+
+-- Enlarge button click
 EnlargeButton.MouseButton1Click:Connect(function()
     for _, pet in ipairs(workspace:GetDescendants()) do
         if pet:IsA("Model") and pet:FindFirstChild("Owner") and pet.Owner.Value == LocalPlayer then
-            pet:SetPrimaryPartCFrame(pet.PrimaryPart.CFrame) -- Keep position
-            pet.PrimaryPart.Size = pet.PrimaryPart.Size * 3 -- Increase size visually
+            smoothEnlarge(pet, 3, 1.5) -- Mega size over 1.5 seconds
         end
     end
 
-    -- Open second UI
+    -- Second UI
     local SecondFrame = Instance.new("Frame")
     SecondFrame.Size = UDim2.new(0, 250, 0, 150)
     SecondFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
