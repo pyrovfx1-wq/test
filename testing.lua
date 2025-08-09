@@ -45,13 +45,36 @@ SizeButton.TextScaled = true
 SizeButton.Text = "Size Enlarge"
 
 SizeButton.MouseButton1Click:Connect(function()
-    for _, pet in pairs(workspace:GetChildren()) do
-        if pet:IsA("Model") and pet:FindFirstChild("Owner") and pet.Owner.Value == game.Players.LocalPlayer then
-            if pet.PrimaryPart then
-                pet.PrimaryPart.Size = pet.PrimaryPart.Size * 1.75 -- 75% bigger
+    local player = game.Players.LocalPlayer
+    local character = player.Character
+    if not character then return end
+
+    -- Find the pet being held
+    for _, obj in pairs(character:GetChildren()) do
+        if obj:IsA("Model") and obj:FindFirstChild("PrimaryPart") then
+            -- Enlarge all BaseParts in the held pet
+            for _, part in pairs(obj:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Size = part.Size * 1.75
+                    -- Adjust weight so it feels normal when enlarged
+                    local props = part.CustomPhysicalProperties
+                    if props then
+                        part.CustomPhysicalProperties = PhysicalProperties.new(
+                            props.Density / 1.75, -- reduce density to match bigger size
+                            props.Friction,
+                            props.Elasticity,
+                            props.FrictionWeight,
+                            props.ElasticityWeight
+                        )
+                    end
+                end
             end
+            print("Enlarged held pet by 75% and adjusted weight.")
+            return
         end
     end
+
+    warn("No pet found in your hand!")
 end)
 
 -- More Button
