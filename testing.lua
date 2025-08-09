@@ -2,12 +2,14 @@
    TOCHIPYRO Script for Grow a Garden  
    Features:
    - Rainbow Title
-   - Size Enlarge (Pets only, proportional & joint-preserving)
-   - More Menu (Bypass + Close)
-   - Works with all pet types in Grow a Garden
+   - Visual Size Enlarge toggle (client-only clone, original pet hidden locally)
+   - Works for all pets
+   - More menu with Bypass and Close UI
+   - 50% transparent GUI
 --]]
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Rainbow color function
@@ -38,16 +40,79 @@ local function getHeldPet()
     return nil
 end
 
--- Natural pet scaling
-local function scaleModelWithJoints(model, scaleFactor)
-    for _, obj in ipairs(model:GetDescendants()) do
+-- Visual clone management
+local activeClone = nil
+local cloneUpdateConnection = nil
+
+local function createVisualClone(model, scaleFactor)
+    -- Clean up old clone
+    if activeClone then
+        if cloneUpdateConnection then
+            cloneUpdateConnection:Disconnect()
+            cloneUpdateConnection = nil
+        end
+        activeClone:Destroy()
+        activeClone = nil
+    end
+
+    local clone = model:Clone()
+    clone.Name = model.Name .. "_VisualClone"
+    clone.Parent = workspace
+
+    -- Scale parts and meshes
+    for _, obj in ipairs(clone:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Size = obj.Size * scaleFactor
+            obj.Transparency = 0
+            obj.CanCollide = false
+            obj.Anchored = true
         elseif obj:IsA("SpecialMesh") then
             obj.Scale = obj.Scale * scaleFactor
         elseif obj:IsA("Motor6D") then
             obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
             obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
+        end
+    end
+
+    -- Hide original pet parts locally
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = 1
+        end
+    end
+
+    -- Position clone on original pet continuously
+    local primaryPart = clone.PrimaryPart or clone:FindFirstChildWhichIsA("BasePart")
+    local originalPrimaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+
+    if primaryPart and originalPrimaryPart then
+        clone:SetPrimaryPartCFrame(originalPrimaryPart.CFrame)
+
+        cloneUpdateConnection = RunService.RenderStepped:Connect(function()
+            if clone and clone.PrimaryPart and originalPrimaryPart then
+                clone:SetPrimaryPartCFrame(originalPrimaryPart.CFrame)
+            end
+        end)
+    end
+
+    activeClone = clone
+end
+
+local function removeVisualClone(model)
+    if activeClone then
+        activeClone:Destroy()
+        activeClone = nil
+    end
+
+    if cloneUpdateConnection then
+        cloneUpdateConnection:Disconnect()
+        cloneUpdateConnection = nil
+    end
+
+    -- Restore original pet parts transparency
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.LocalTransparencyModifier = 0
         end
     end
 end
@@ -77,7 +142,7 @@ Title.Parent = MainFrame
 local SizeButton = Instance.new("TextButton")
 SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 50)
-SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SizeButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 SizeButton.TextColor3 = Color3.new(1, 1, 1)
 SizeButton.Text = "Size Enlarge"
 SizeButton.Parent = MainFrame
@@ -86,7 +151,7 @@ SizeButton.Parent = MainFrame
 local MoreButton = Instance.new("TextButton")
 MoreButton.Size = UDim2.new(1, -20, 0, 40)
 MoreButton.Position = UDim2.new(0, 10, 0, 100)
-MoreButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+MoreButton.BackgroundColor3 = Color3.fromRGB(255, 100, 255)
 MoreButton.TextColor3 = Color3.new(1, 1, 1)
 MoreButton.Text = "More"
 MoreButton.Parent = MainFrame
@@ -110,7 +175,7 @@ UIStroke.Parent = MoreFrame
 local BypassButton = Instance.new("TextButton")
 BypassButton.Size = UDim2.new(1, -20, 0, 40)
 BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+BypassButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 BypassButton.TextColor3 = Color3.new(1, 1, 1)
 BypassButton.Text = "Bypass"
 BypassButton.Parent = MoreFrame
@@ -119,19 +184,31 @@ BypassButton.Parent = MoreFrame
 local CloseButton = Instance.new("TextButton")
 CloseButton.Size = UDim2.new(1, -20, 0, 40)
 CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 CloseButton.TextColor3 = Color3.new(1, 1, 1)
 CloseButton.Text = "Close UI"
 CloseButton.Parent = MoreFrame
 
+-- Visual enlarge toggle state
+local visualScaleFactor = 1.75
+local isVisualEnlarged = false
+
 -- Button Logic
 SizeButton.MouseButton1Click:Connect(function()
     local pet = getHeldPet()
-    if pet then
-        scaleModelWithJoints(pet, 1.75)
-        print("Pet enlarged:", pet.Name)
-    else
+    if not pet then
         warn("No held pet found.")
+        return
+    end
+
+    if not isVisualEnlarged then
+        createVisualClone(pet, visualScaleFactor)
+        isVisualEnlarged = true
+        SizeButton.Text = "Restore Size"
+    else
+        removeVisualClone(pet)
+        isVisualEnlarged = false
+        SizeButton.Text = "Size Enlarge"
     end
 end)
 
@@ -140,6 +217,12 @@ MoreButton.MouseButton1Click:Connect(function()
 end)
 
 CloseButton.MouseButton1Click:Connect(function()
+    if isVisualEnlarged then
+        local pet = getHeldPet()
+        if pet then
+            removeVisualClone(pet)
+        end
+    end
     ScreenGui:Destroy()
 end)
 
