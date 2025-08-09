@@ -31,93 +31,133 @@ local function increasePetWeight(petModel)
     
     -- Common weight attribute names in pet games
     local weightAttributes = {
-        "Weight", "weight", "WeightKG", "Mass", "mass", "Size", "PetWeight"
+        "Weight", "weight", "WeightKG", "Mass", "mass", "PetWeight", "petWeight"
     }
     
     local weightFound = false
+    local originalWeight = nil
     
-    -- Try to find and modify weight attributes
+    -- Try to find existing weight attributes
     for _, attrName in ipairs(weightAttributes) do
         local currentWeight = petModel:GetAttribute(attrName)
         if currentWeight and type(currentWeight) == "number" then
-            -- Store original weight if not already stored
-            if not originalWeights[id] then
-                originalWeights[id] = {}
-            end
-            if not originalWeights[id][attrName] then
-                originalWeights[id][attrName] = currentWeight
-            end
-            
-            -- Set new weight
-            local newWeight = originalWeights[id][attrName] * WEIGHT_MULTIPLIER
-            petModel:SetAttribute(attrName, newWeight)
+            originalWeight = currentWeight
             weightFound = true
-            print("[TOCHIPYRO] Increased", attrName, "from", currentWeight, "to", newWeight, "kg")
+            break
         end
     end
     
-    -- If no weight attribute found, create one
-    if not weightFound then
-        local baseWeight = 10 -- Default base weight in kg
+    -- Store original weight if not already stored
+    if not originalWeights[id] then
+        originalWeights[id] = {}
+    end
+    
+    -- If we found existing weight, use it
+    if weightFound and originalWeight then
+        if not originalWeights[id]["Weight"] then
+            originalWeights[id]["Weight"] = originalWeight
+        end
+        local newWeight = originalWeights[id]["Weight"] * WEIGHT_MULTIPLIER
+        petModel:SetAttribute("Weight", newWeight)
+        print("[TOCHIPYRO] Increased weight from", originalWeight, "to", newWeight, "kg")
+    else
+        -- If no weight found, check common default values based on pet type/rarity
+        local baseWeight = 2.5 -- Default base weight in kg (Normal pet range)
+        
+        -- Try to determine pet rarity/type for more realistic base weight
+        local petName = petModel.Name:lower()
+        if string.find(petName, "huge") or string.find(petName, "giant") then
+            baseWeight = 6.0 -- Huge pet range
+        elseif string.find(petName, "titanic") then
+            baseWeight = 8.5 -- Titanic pet range  
+        elseif string.find(petName, "godly") then
+            baseWeight = 9.5 -- Godly pet range
+        elseif string.find(petName, "small") or string.find(petName, "tiny") then
+            baseWeight = 0.7 -- Small pet range
+        end
+        
+        originalWeights[id]["Weight"] = baseWeight
         local newWeight = baseWeight * WEIGHT_MULTIPLIER
         
-        -- Store original
-        if not originalWeights[id] then
-            originalWeights[id] = {}
-        end
-        originalWeights[id]["Weight"] = baseWeight
-        
         petModel:SetAttribute("Weight", newWeight)
-        print("[TOCHIPYRO] Created Weight attribute:", newWeight, "kg")
+        print("[TOCHIPYRO] Created Weight attribute:", newWeight, "kg (base:", baseWeight, "kg)")
     end
     
-    -- Try to find and update GUI elements that display weight
-    updateWeightGUI(petModel)
+    -- Try to update GUI elements immediately
+    task.spawn(function()
+        for i = 1, 5 do -- Try multiple times in case GUI loads later
+            updateWeightGUI(petModel)
+            task.wait(0.5)
+        end
+    end)
 end
 
 -- Function to update weight display in GUI elements
 local function updateWeightGUI(petModel)
     if not petModel then return end
     
-    -- Look for GUI elements that might display weight
-    for _, descendant in ipairs(petModel:GetDescendants()) do
-        if descendant:IsA("TextLabel") or descendant:IsA("TextBox") then
-            local text = descendant.Text
-            -- Check if text contains weight information
-            if string.find(text:lower(), "weight") or 
-               string.find(text:lower(), "kg") or 
-               string.find(text:lower(), "mass") then
+    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not playerGui then return end
+    
+    local newWeight = petModel:GetAttribute("Weight") or petModel:GetAttribute("weight")
+    if not newWeight then return end
+    
+    -- Search for pet viewing GUI (the "View" dialog that shows pet stats)
+    local function searchAndUpdateGUI(parent)
+        for _, gui in ipairs(parent:GetDescendants()) do
+            if gui:IsA("TextLabel") or gui:IsA("TextBox") then
+                local text = gui.Text
                 
-                -- Try to extract and update the number
-                local weight = petModel:GetAttribute("Weight") or petModel:GetAttribute("weight")
-                if weight then
-                    -- Update the text with new weight
-                    local newText = string.gsub(text, "%d+%.?%d*", string.format("%.1f", weight))
-                    descendant.Text = newText
+                -- Look for weight-related text patterns
+                if string.find(text:lower(), "weight") or 
+                   string.match(text, "%d+%.?%d*%s*kg") or
+                   string.match(text, "weight:%s*%d+%.?%d*") then
+                    
+                    -- Update the weight value in the text
+                    local updatedText = string.gsub(text, "(%d+%.?%d*)(%s*kg)", string.format("%.1f", newWeight) .. "%2")
+                    updatedText = string.gsub(updatedText, "(weight:%s*)(%d+%.?%d*)", "%1" .. string.format("%.1f", newWeight))
+                    updatedText = string.gsub(updatedText, "(%d+%.?%d*)(%s*KG)", string.format("%.1f", newWeight) .. "%2")
+                    
+                    if updatedText ~= text then
+                        gui.Text = updatedText
+                        print("[TOCHIPYRO] Updated weight display:", updatedText)
+                    end
+                end
+                
+                -- Also check for standalone number + kg pattern
+                if string.match(text, "^%d+%.?%d*%s*[Kk][Gg]$") then
+                    gui.Text = string.format("%.1f kg", newWeight)
+                    print("[TOCHIPYRO] Updated standalone weight:", gui.Text)
                 end
             end
         end
     end
     
-    -- Also check for BillboardGuis or SurfaceGuis attached to the pet
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        for _, gui in ipairs(playerGui:GetDescendants()) do
-            if gui:IsA("TextLabel") and gui.Parent and gui.Parent.Name:find(petModel.Name) then
-                local text = gui.Text
-                if string.find(text:lower(), "weight") or string.find(text:lower(), "kg") then
-                    local weight = petModel:GetAttribute("Weight") or petModel:GetAttribute("weight")
-                    if weight then
-                        local newText = string.gsub(text, "%d+%.?%d*", string.format("%.1f", weight))
-                        gui.Text = newText
-                    end
-                end
-            end
-        end
+    -- Search in PlayerGui for pet view dialogs
+    searchAndUpdateGUI(playerGui)
+    
+    -- Also search in StarterGui in case some elements are there
+    local starterGui = game:GetService("StarterGui")
+    if starterGui then
+        searchAndUpdateGUI(starterGui)
     end
+    
+    -- Search in the pet model itself for any attached GUIs
+    searchAndUpdateGUI(petModel)
 end
 
--- Function to restore original weight
+-- Add a continuous GUI monitor for weight updates
+local function startWeightGUIMonitor(petModel)
+    local id = getPetUniqueId(petModel)
+    if not id then return end
+    
+    task.spawn(function()
+        while petModel and petModel.Parent and enlargedPetIds[id] do
+            updateWeightGUI(petModel)
+            task.wait(1) -- Check every second
+        end
+    end)
+end
 local function restoreOriginalWeight(petModel)
     if not petModel then return end
     
