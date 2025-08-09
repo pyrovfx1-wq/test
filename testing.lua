@@ -1,129 +1,107 @@
+--[[ 
+    TOCHIPYRO Script
+    Works only in Grow a Garden
+]]
+
+if game.PlaceId ~= 123456789 then -- Replace with Grow a Garden's actual PlaceId
+    warn("This script only works in Grow a Garden!")
+    return
+end
+
 local Players = game:GetService("Players")
-local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
+local LocalPlayer = Players.LocalPlayer
 
-local pets = {
-    { Name = "Dragonfly", Weight = "---", Age = "---" },
-    { Name = "Queen Bee", Weight = "---", Age = "---" },
-    { Name = "Disco Bee", Weight = "---", Age = "---" },
-    { Name = "Raccoon", Weight = "---", Age = "---" },
-    { Name = "Red Fox", Weight = "---", Age = "---" },
-}
-
--- Create UI
-local screenGui = Instance.new("ScreenGui", playerGui)
-screenGui.Name = "PetLevelerUI"
-screenGui.ResetOnSpawn = false
-
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 400, 0, 300)
-mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BackgroundTransparency = 0.5
-
-local corner = Instance.new("UICorner", mainFrame)
-corner.CornerRadius = UDim.new(0, 12)
-
--- Title
-local title = Instance.new("TextLabel", mainFrame)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.Position = UDim2.new(0, 0, 0, 0)
-title.BackgroundTransparency = 1
-title.Font = Enum.Font.GothamBold
-title.TextSize = 28
-title.Text = "Pet Leveler"
-title.ClipsDescendants = true
-
--- Rainbow text
-spawn(function()
-    while true do
-        title.TextColor3 = Color3.fromHSV(tick() % 5 / 5, 1, 1)
-        wait(0.1)
-    end
-end)
-
--- Dropdown selection
-local dropdown = Instance.new("TextButton", mainFrame)
-dropdown.Size = UDim2.new(0.9, 0, 0, 40)
-dropdown.Position = UDim2.new(0.05, 0, 0, 50)
-dropdown.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-dropdown.Text = "Select Pet"
-dropdown.Font = Enum.Font.Gotham
-dropdown.TextSize = 18
-dropdown.TextColor3 = Color3.new(1,1,1)
-
-local dropdownOpen = false
-
-dropdown.MouseButton1Click:Connect(function()
-    if dropdownOpen then return end
-    dropdownOpen = true
-
-    -- Clear old items
-    for _, child in ipairs(mainFrame:GetChildren()) do
-        if child.Name == "DropdownItem" then child:Destroy() end
-    end
-
-    local yOffset = 100
-    for _, pet in ipairs(pets) do
-        local btn = Instance.new("TextButton", mainFrame)
-        btn.Name = "DropdownItem"
-        btn.Size = UDim2.new(0.9, 0, 0, 30)
-        btn.Position = UDim2.new(0.05, 0, 0, yOffset)
-        btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        btn.Text = pet.Name
-        btn.Font = Enum.Font.Gotham
-        btn.TextSize = 18
-        btn.TextColor3 = Color3.new(1,1,1)
-        btn.MouseButton1Click:Connect(function()
-            dropdown.Text = pet.Name
-            infoLabel.Text = string.format("Pet Info:\nName: %s\nWeight: %s\nAge: %s", pet.Name, pet.Weight, pet.Age)
-            for _, d in ipairs(mainFrame:GetChildren()) do
-                if d.Name == "DropdownItem" then d:Destroy() end
+-- Rainbow text function
+local function rainbowText(label)
+    task.spawn(function()
+        while task.wait() do
+            for hue = 0, 1, 0.01 do
+                label.TextColor3 = Color3.fromHSV(hue, 1, 1)
+                task.wait(0.05)
             end
-            dropdownOpen = false
-        end)
-        yOffset = yOffset + 35
+        end
+    end)
+end
+
+-- Main UI
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 300, 0, 150)
+MainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+MainFrame.BackgroundTransparency = 0.5
+MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
+MainFrame.Parent = ScreenGui
+
+local Title = Instance.new("TextLabel")
+Title.Text = "TOCHIPYRO Script"
+Title.Font = Enum.Font.SourceSansBold
+Title.TextScaled = true
+Title.BackgroundTransparency = 1
+Title.Size = UDim2.new(1, 0, 0.3, 0)
+Title.Parent = MainFrame
+rainbowText(Title)
+
+local EnlargeButton = Instance.new("TextButton")
+EnlargeButton.Text = "Size Enlarge"
+EnlargeButton.Font = Enum.Font.SourceSansBold
+EnlargeButton.TextScaled = true
+EnlargeButton.Size = UDim2.new(0.8, 0, 0.3, 0)
+EnlargeButton.Position = UDim2.new(0.1, 0, 0.5, 0)
+EnlargeButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+EnlargeButton.Parent = MainFrame
+
+-- Enlarging pet visually only
+EnlargeButton.MouseButton1Click:Connect(function()
+    for _, pet in ipairs(workspace:GetDescendants()) do
+        if pet:IsA("Model") and pet:FindFirstChild("Owner") and pet.Owner.Value == LocalPlayer then
+            pet:SetPrimaryPartCFrame(pet.PrimaryPart.CFrame) -- Keep position
+            pet.PrimaryPart.Size = pet.PrimaryPart.Size * 3 -- Increase size visually
+        end
     end
-end)
 
--- Info Label
-local infoLabel = Instance.new("TextLabel", mainFrame)
-infoLabel.Size = UDim2.new(0.9, 0, 0, 100)
-infoLabel.Position = UDim2.new(0.05, 0, 0, 100)
-infoLabel.BackgroundTransparency = 1
-infoLabel.Text = "Pet Info:\nName: -\nWeight: -\nAge: -"
-infoLabel.Font = Enum.Font.Gotham
-infoLabel.TextSize = 18
-infoLabel.TextColor3 = Color3.new(1,1,1)
-infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-infoLabel.TextYAlignment = Enum.TextYAlignment.Top
+    -- Open second UI
+    local SecondFrame = Instance.new("Frame")
+    SecondFrame.Size = UDim2.new(0, 250, 0, 150)
+    SecondFrame.Position = UDim2.new(0.5, -125, 0.5, -75)
+    SecondFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128) -- Purple
+    SecondFrame.BackgroundTransparency = 0.5
+    SecondFrame.Parent = ScreenGui
+    SecondFrame.BorderSizePixel = 0
+    SecondFrame.ClipsDescendants = true
 
--- Level Up Button
-local levelBtn = Instance.new("TextButton", mainFrame)
-levelBtn.Size = UDim2.new(0.9, 0, 0, 40)
-levelBtn.Position = UDim2.new(0.05, 0, 0, 220)
-levelBtn.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
-levelBtn.Text = "Level Up"
-levelBtn.Font = Enum.Font.GothamBold
-levelBtn.TextSize = 20
-levelBtn.TextColor3 = Color3.new(1,1,1)
-levelBtn.MouseButton1Click:Connect(function()
-    print("Visual Level Up:", dropdown.Text)
-end)
+    -- Glow effect
+    local UIStroke = Instance.new("UIStroke")
+    UIStroke.Thickness = 4
+    UIStroke.Color = Color3.fromRGB(200, 0, 255)
+    UIStroke.Parent = SecondFrame
 
--- Close button
-local closeBtn = Instance.new("TextButton", mainFrame)
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.GothamBold
-closeBtn.TextSize = 18
-closeBtn.TextColor3 = Color3.new(1,1,1)
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
+    local UICorner = Instance.new("UICorner")
+    UICorner.CornerRadius = UDim.new(0, 12)
+    UICorner.Parent = SecondFrame
+
+    local BypassButton = Instance.new("TextButton")
+    BypassButton.Text = "Bypass"
+    BypassButton.Font = Enum.Font.SourceSansBold
+    BypassButton.TextScaled = true
+    BypassButton.Size = UDim2.new(0.8, 0, 0.3, 0)
+    BypassButton.Position = UDim2.new(0.1, 0, 0.1, 0)
+    BypassButton.BackgroundColor3 = Color3.fromRGB(100, 0, 200)
+    BypassButton.Parent = SecondFrame
+
+    local CloseButton = Instance.new("TextButton")
+    CloseButton.Text = "Close UI"
+    CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.TextScaled = true
+    CloseButton.Size = UDim2.new(0.8, 0, 0.3, 0)
+    CloseButton.Position = UDim2.new(0.1, 0, 0.6, 0)
+    CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    CloseButton.Parent = SecondFrame
+
+    CloseButton.MouseButton1Click:Connect(function()
+        ScreenGui:Destroy()
+    end)
 end)
 
 
