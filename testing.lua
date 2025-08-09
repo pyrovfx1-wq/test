@@ -7,6 +7,8 @@ local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ENLARGE_SCALE = 1.75
+local WEIGHT_MULTIPLIER = 3.0 -- How much heavier the pet feels
+local GRAVITY_MULTIPLIER = 1.5 -- Increased gravity effect
 
 -- Containers to monitor for pet spawns
 local petContainers = {
@@ -26,20 +28,78 @@ local function rainbowColor(t)
     return Color3.fromHSV(hue, 1, 1)
 end
 
--- Enhanced scaling function with better joint handling
+-- Enhanced scaling function with realistic weight physics
 local function scaleModelWithJoints(model, scaleFactor)
     if not model or not model.Parent then return end
     
     -- Scale all parts and meshes
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
+            -- Scale the part
             obj.Size = obj.Size * scaleFactor
+            
+            -- Apply realistic weight physics
+            local originalMass = obj.Mass
+            obj.Mass = originalMass * (scaleFactor * WEIGHT_MULTIPLIER)
+            
+            -- Adjust physics properties for heavier feel
+            obj.Material = Enum.Material.Concrete -- Heavier material feel
+            
+            -- Create BodyVelocity for weight effects (if pet moves)
+            local bodyVel = obj:FindFirstChild("TOCHIPYRO_Weight")
+            if not bodyVel then
+                bodyVel = Instance.new("BodyVelocity")
+                bodyVel.Name = "TOCHIPYRO_Weight"
+                bodyVel.MaxForce = Vector3.new(0, math.huge, 0)
+                bodyVel.Velocity = Vector3.new(0, -workspace.Gravity * GRAVITY_MULTIPLIER, 0)
+                bodyVel.Parent = obj
+            end
+            
+            -- Add ground impact effect
+            local function addGroundImpact()
+                local raycast = workspace:Raycast(obj.Position, Vector3.new(0, -5, 0))
+                if raycast then
+                    -- Create dust effect on ground contact
+                    local dust = Instance.new("Explosion")
+                    dust.Position = raycast.Position
+                    dust.BlastRadius = scaleFactor * 10
+                    dust.BlastPressure = 0 -- No damage
+                    dust.Visible = false -- Just the effect
+                    dust.Parent = workspace
+                    
+                    -- Screen shake effect for heavy landing
+                    local camera = workspace.CurrentCamera
+                    if camera then
+                        local originalCFrame = camera.CFrame
+                        for i = 1, 10 do
+                            camera.CFrame = originalCFrame + Vector3.new(
+                                math.random(-1, 1) * scaleFactor * 0.5,
+                                math.random(-1, 1) * scaleFactor * 0.5,
+                                math.random(-1, 1) * scaleFactor * 0.5
+                            )
+                            task.wait(0.05)
+                        end
+                        camera.CFrame = originalCFrame
+                    end
+                end
+            end
+            
+            -- Monitor for landing impacts
+            local lastVelocity = obj.Velocity
+            obj:GetPropertyChangedSignal("Velocity"):Connect(function()
+                if lastVelocity.Y < -10 and obj.Velocity.Y > -5 then
+                    addGroundImpact()
+                end
+                lastVelocity = obj.Velocity
+            end)
+            
             -- Force network ownership for better replication
             if obj.CanSetNetworkOwnership then
                 pcall(function()
                     obj:SetNetworkOwner(LocalPlayer)
                 end)
             end
+            
         elseif obj:IsA("SpecialMesh") then
             obj.Scale = obj.Scale * scaleFactor
         elseif obj:IsA("Decal") or obj:IsA("Texture") then
@@ -49,24 +109,54 @@ local function scaleModelWithJoints(model, scaleFactor)
                 obj.StudsPerTileV = obj.StudsPerTileV * scaleFactor
             end
         elseif obj:IsA("Motor6D") or obj:IsA("Weld") or obj:IsA("WeldConstraint") then
-            -- Better joint scaling
+            -- Better joint scaling with weight consideration
             if obj:IsA("Motor6D") then
                 local c0Pos = obj.C0.Position * scaleFactor
                 local c1Pos = obj.C1.Position * scaleFactor
                 obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
                 obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
+                
+                -- Reduce motor strength for heavier feel
+                if obj:FindFirstChild("MaxTorque") then
+                    obj.MaxTorque = obj.MaxTorque / WEIGHT_MULTIPLIER
+                end
             elseif obj:IsA("Weld") then
                 local c0Pos = obj.C0.Position * scaleFactor
                 local c1Pos = obj.C1.Position * scaleFactor
                 obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
                 obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
             end
+        elseif obj:IsA("Humanoid") then
+            -- Slow down movement for heavy feel
+            obj.WalkSpeed = obj.WalkSpeed / (scaleFactor * 0.8)
+            obj.JumpPower = obj.JumpPower / WEIGHT_MULTIPLIER
         end
     end
     
-    -- Mark the model as enlarged
+    -- Add ambient heavy breathing sound effect
+    task.spawn(function()
+        while model.Parent and model:GetAttribute("TOCHIPYRO_Enlarged") do
+            local sound = Instance.new("Sound")
+            sound.SoundId = "rbxasset://sounds/impact_water.mp3" -- Heavy step sound
+            sound.Volume = 0.3 * scaleFactor
+            sound.Pitch = 0.7 / scaleFactor -- Lower pitch for bigger size
+            sound.Parent = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+            sound:Play()
+            
+            sound.Ended:Connect(function()
+                sound:Destroy()
+            end)
+            
+            task.wait(2 + math.random(1, 3)) -- Random heavy breathing intervals
+        end
+    end)
+    
+    -- Mark the model as enlarged with weight
     model:SetAttribute("TOCHIPYRO_Enlarged", true)
     model:SetAttribute("TOCHIPYRO_Scale", scaleFactor)
+    model:SetAttribute("TOCHIPYRO_Weighted", true)
+    
+    print("[TOCHIPYRO] Applied realistic weight physics to enlarged pet!")
 end
 
 -- Get unique pet ID with better fallbacks
@@ -113,11 +203,11 @@ local function startPetMonitoring(pet)
             return
         end
         
-        -- Check if pet needs re-enlargement
+        -- Check if pet needs re-enlargement and weight physics
         if enlargedPetIds[id] and not pet:GetAttribute("TOCHIPYRO_Enlarged") then
             task.wait(0.1) -- Small delay to ensure stability
             scaleModelWithJoints(pet, ENLARGE_SCALE)
-            print("[TOCHIPYRO] Re-applied enlargement to pet:", pet.Name)
+            print("[TOCHIPYRO] Re-applied enlargement with weight physics to pet:", pet.Name)
         end
     end)
 end
@@ -231,7 +321,7 @@ local function enlargeCurrentHeldPet()
             pet.PrimaryPart.CFrame = originalCFrame
         end
         
-        print("[TOCHIPYRO] Enlarged pet:", pet.Name)
+        print("[TOCHIPYRO] Enlarged pet with realistic weight:", pet.Name)
     else
         -- Try to find pets in other locations
         local foundPet = false
@@ -244,7 +334,7 @@ local function enlargeCurrentHeldPet()
                             scaleModelWithJoints(obj, ENLARGE_SCALE)
                             markPetAsEnlarged(obj)
                             startPetMonitoring(obj)
-                            print("[TOCHIPYRO] Found and enlarged pet:", obj.Name)
+                            print("[TOCHIPYRO] Found and enlarged pet with weight physics:", obj.Name)
                             foundPet = true
                             break
                         end
