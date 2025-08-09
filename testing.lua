@@ -46,35 +46,45 @@ SizeButton.Text = "Size Enlarge"
 
 SizeButton.MouseButton1Click:Connect(function()
     local player = game.Players.LocalPlayer
-    local character = player.Character
-    if not character then return end
+    local char = player.Character
+    if not char then return end
 
-    -- Find the pet being held
-    for _, obj in pairs(character:GetChildren()) do
-        if obj:IsA("Model") and obj:FindFirstChild("PrimaryPart") then
-            -- Enlarge all BaseParts in the held pet
-            for _, part in pairs(obj:GetDescendants()) do
-                if part:IsA("BasePart") then
+    local foundPet = false
+
+    -- Search through what you're holding
+    for _, tool in ipairs(char:GetChildren()) do
+        if tool:IsA("Tool") or tool:IsA("Model") then
+            for _, part in ipairs(tool:GetDescendants()) do
+                -- MeshPart scaling
+                if part:IsA("MeshPart") then
                     part.Size = part.Size * 1.75
-                    -- Adjust weight so it feels normal when enlarged
+                    foundPet = true
+                end
+                -- SpecialMesh scaling
+                if part:IsA("SpecialMesh") then
+                    part.Scale = part.Scale * 1.75
+                    foundPet = true
+                end
+                -- Adjust weight if possible
+                if part:IsA("BasePart") and part.CustomPhysicalProperties then
                     local props = part.CustomPhysicalProperties
-                    if props then
-                        part.CustomPhysicalProperties = PhysicalProperties.new(
-                            props.Density / 1.75, -- reduce density to match bigger size
-                            props.Friction,
-                            props.Elasticity,
-                            props.FrictionWeight,
-                            props.ElasticityWeight
-                        )
-                    end
+                    part.CustomPhysicalProperties = PhysicalProperties.new(
+                        props.Density / 1.75,
+                        props.Friction,
+                        props.Elasticity,
+                        props.FrictionWeight,
+                        props.ElasticityWeight
+                    )
                 end
             end
-            print("Enlarged held pet by 75% and adjusted weight.")
-            return
         end
     end
 
-    warn("No pet found in your hand!")
+    if foundPet then
+        print("Pet enlarged visually + weight adjusted.")
+    else
+        warn("No pet mesh found in hand.")
+    end
 end)
 
 -- More Button
