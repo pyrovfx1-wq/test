@@ -1,53 +1,54 @@
--- // TOCHIPYRO Script for Grow a Garden
-if game.PlaceId ~= 126884695634066 then -- Latest Grow a Garden place ID
+-- TOCHIPYRO Script for Grow a Garden
+if game.PlaceId ~= 126884695634066 then
     warn("This script only works in Grow a Garden.")
     return
 end
 
--- Create main UI
+-- Rainbow text function
+local function rainbowText(textLabel)
+    spawn(function()
+        while textLabel.Parent do
+            for hue = 0, 1, 0.02 do
+                textLabel.TextColor3 = Color3.fromHSV(hue, 1, 1)
+                task.wait(0.02)
+            end
+        end
+    end)
+end
+
+-- Create UI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TOCHIPYRO_UI"
+ScreenGui.Name = "TOCHIPYRO_Script"
 ScreenGui.ResetOnSpawn = false
-ScreenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.Parent = game.CoreGui
 
--- Main Frame
-local MainFrame = Instance.new("Frame")
-MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-MainFrame.BackgroundTransparency = 0.5
-MainFrame.BorderSizePixel = 0
-MainFrame.Position = UDim2.new(0.4, 0, 0.4, 0)
+local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 300, 0, 200)
-MainFrame.Parent = ScreenGui
+MainFrame.Position = UDim2.new(0.35, 0, 0.35, 0)
+MainFrame.BackgroundTransparency = 0.5
+MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 
--- Rainbow title
-local Title = Instance.new("TextLabel")
+local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 50)
 Title.BackgroundTransparency = 1
-Title.Text = "TOCHIPYRO Script"
+Title.Font = Enum.Font.GothamBold
 Title.TextScaled = true
-Title.Font = Enum.Font.SourceSansBold
-Title.Parent = MainFrame
+Title.Text = "TOCHIPYRO Script"
+rainbowText(Title)
 
--- Rainbow effect
-task.spawn(function()
-    while Title do
-        for hue = 0, 1, 0.01 do
-            Title.TextColor3 = Color3.fromHSV(hue, 1, 1)
-            task.wait(0.05)
-        end
-    end
-end)
+-- Scale factor
+local SCALE = 1.75
 
--- Size Enlarge button
-local SizeButton = Instance.new("TextButton")
-SizeButton.Size = UDim2.new(1, -20, 0, 40)
-SizeButton.Position = UDim2.new(0, 10, 0, 60)
-SizeButton.Text = "Size Enlarge"
+-- Size Enlarge Button
+local SizeButton = Instance.new("TextButton", MainFrame)
+SizeButton.Size = UDim2.new(0.9, 0, 0, 40)
+SizeButton.Position = UDim2.new(0.05, 0, 0.35, 0)
+SizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+SizeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+SizeButton.Font = Enum.Font.GothamBold
 SizeButton.TextScaled = true
-SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-SizeButton.Parent = MainFrame
+SizeButton.Text = "Size Enlarge"
 
--- Nearest pet enlarger
 SizeButton.MouseButton1Click:Connect(function()
     local player = game.Players.LocalPlayer
     local char = player.Character
@@ -56,17 +57,20 @@ SizeButton.MouseButton1Click:Connect(function()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    local foundPet = false
-    local nearestPet
+    local found = false
+    local nearestPet = nil
+    local shortestDist = math.huge
 
-    -- Search for nearest pet model
+    -- Find nearest model with mesh
     for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj ~= char and obj:FindFirstChildOfClass("Humanoid") == nil then
-            if obj:FindFirstChildWhichIsA("MeshPart") or obj:FindFirstChildWhichIsA("SpecialMesh") then
-                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                if part and (part.Position - hrp.Position).Magnitude < 10 then
+        if obj:IsA("Model") and obj ~= char and not obj:FindFirstChildOfClass("Humanoid") then
+            local meshPart = obj:FindFirstChildWhichIsA("MeshPart") or obj:FindFirstChildWhichIsA("SpecialMesh")
+            local basePart = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+            if meshPart and basePart then
+                local dist = (basePart.Position - hrp.Position).Magnitude
+                if dist < shortestDist and dist <= 10 then
+                    shortestDist = dist
                     nearestPet = obj
-                    break
                 end
             end
         end
@@ -75,78 +79,76 @@ SizeButton.MouseButton1Click:Connect(function()
     if nearestPet then
         for _, part in ipairs(nearestPet:GetDescendants()) do
             if part:IsA("MeshPart") then
-                part.Size = part.Size * 1.75
-                foundPet = true
+                part.Size = part.Size * SCALE
+                found = true
             elseif part:IsA("SpecialMesh") then
-                part.Scale = part.Scale * 1.75
-                foundPet = true
+                part.Scale = part.Scale * SCALE
+                found = true
             elseif part:IsA("BasePart") and part.CustomPhysicalProperties then
-                local props = part.CustomPhysicalProperties
+                local p = part.CustomPhysicalProperties
                 part.CustomPhysicalProperties = PhysicalProperties.new(
-                    props.Density / 1.75,
-                    props.Friction,
-                    props.Elasticity,
-                    props.FrictionWeight,
-                    props.ElasticityWeight
+                    p.Density / (SCALE^3),
+                    p.Friction,
+                    p.Elasticity,
+                    p.FrictionWeight,
+                    p.ElasticityWeight
                 )
             end
+        end
+        if found then
+            print("Pet enlarged visually + weight adjusted.")
         end
     else
         warn("No pet found near player.")
     end
-
-    if foundPet then
-        print("Pet enlarged visually + weight adjusted.")
-    else
-        warn("No pet mesh found in nearby model.")
-    end
 end)
 
--- "More" button
-local MoreButton = Instance.new("TextButton")
-MoreButton.Size = UDim2.new(1, -20, 0, 40)
-MoreButton.Position = UDim2.new(0, 10, 0, 110)
-MoreButton.Text = "More"
+-- More Button
+local MoreButton = Instance.new("TextButton", MainFrame)
+MoreButton.Size = UDim2.new(0.9, 0, 0, 40)
+MoreButton.Position = UDim2.new(0.05, 0, 0.6, 0)
+MoreButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+MoreButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+MoreButton.Font = Enum.Font.GothamBold
 MoreButton.TextScaled = true
-MoreButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-MoreButton.Parent = MainFrame
+MoreButton.Text = "More"
 
 -- More UI
-local MoreFrame = Instance.new("Frame")
-MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
+local MoreFrame = Instance.new("Frame", ScreenGui)
+MoreFrame.Size = UDim2.new(0, 250, 0, 150)
+MoreFrame.Position = UDim2.new(0.4, 0, 0.4, 0)
 MoreFrame.BackgroundTransparency = 0.5
-MoreFrame.Size = UDim2.new(0, 300, 0, 150)
-MoreFrame.Position = UDim2.new(0.4, 0, 0.6, 0)
+MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
 MoreFrame.Visible = false
-MoreFrame.Parent = ScreenGui
+local UICorner = Instance.new("UICorner", MoreFrame)
+UICorner.CornerRadius = UDim.new(0, 15)
 
-MoreFrame.ClipsDescendants = true
-MoreFrame.BorderSizePixel = 0
-MoreFrame.ZIndex = 2
-
--- Bypass button
-local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(1, -20, 0, 40)
-BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.Text = "Bypass"
+-- Bypass Button
+local BypassButton = Instance.new("TextButton", MoreFrame)
+BypassButton.Size = UDim2.new(0.9, 0, 0, 40)
+BypassButton.Position = UDim2.new(0.05, 0, 0.2, 0)
+BypassButton.BackgroundColor3 = Color3.fromRGB(90, 0, 90)
+BypassButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+BypassButton.Font = Enum.Font.GothamBold
 BypassButton.TextScaled = true
-BypassButton.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-BypassButton.Parent = MoreFrame
-
--- Close UI button
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.Text = "Close UI"
-CloseButton.TextScaled = true
-CloseButton.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
-CloseButton.Parent = MoreFrame
-
--- Button functions
-MoreButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = not MoreFrame.Visible
+BypassButton.Text = "Bypass"
+BypassButton.MouseButton1Click:Connect(function()
+    print("Bypass Activated")
 end)
 
+-- Close UI Button
+local CloseButton = Instance.new("TextButton", MoreFrame)
+CloseButton.Size = UDim2.new(0.9, 0, 0, 40)
+CloseButton.Position = UDim2.new(0.05, 0, 0.6, 0)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+CloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextScaled = true
+CloseButton.Text = "Close UI"
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
+end)
+
+MoreButton.MouseButton1Click:Connect(function()
+    MoreFrame.Visible = not MoreFrame.Visible
 end)
