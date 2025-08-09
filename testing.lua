@@ -1,5 +1,5 @@
 -- // TOCHIPYRO Script for Grow a Garden
-if game.PlaceId ~= 8849628681 then -- Latest Grow a Garden place ID
+if game.PlaceId ~= 126884695634066 then -- Latest Grow a Garden place ID
     warn("This script only works in Grow a Garden.")
     return
 end
