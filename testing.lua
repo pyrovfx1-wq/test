@@ -1,25 +1,22 @@
--- TOCHIPYRO Script (Grow a Garden) with improved visibility and persistence
+-- TOCHIPYRO Script (Grow a Garden) with simple realistic weight effects
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local ENLARGE_SCALE = 1.75
-local WEIGHT_MULTIPLIER = 3.0 -- How much heavier the pet feels
-local GRAVITY_MULTIPLIER = 1.5 -- Increased gravity effect
+local WEIGHT_MULTIPLIER = 2.0 -- Simple weight increase
 
 -- Containers to monitor for pet spawns
 local petContainers = {
     workspace,
     workspace:FindFirstChild("Pets"),
     workspace:FindFirstChild("PetSlots"),
-    workspace:FindFirstChild("GardenSlots"), -- Added garden slots
+    workspace:FindFirstChild("GardenSlots"),
 }
 
 local enlargedPetIds = {}
-local petConnections = {}
 local petUpdateLoops = {}
 
 -- Rainbow color helper
@@ -28,142 +25,85 @@ local function rainbowColor(t)
     return Color3.fromHSV(hue, 1, 1)
 end
 
--- Enhanced scaling function with realistic weight physics
+-- Simplified scaling function with basic weight physics
 local function scaleModelWithJoints(model, scaleFactor)
     if not model or not model.Parent then return end
     
-    -- Scale all parts and meshes
+    -- Scale all parts and add simple weight effects
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
             -- Scale the part
             obj.Size = obj.Size * scaleFactor
             
-            -- Apply realistic weight physics
-            local originalMass = obj.Mass
-            obj.Mass = originalMass * (scaleFactor * WEIGHT_MULTIPLIER)
-            
-            -- Adjust physics properties for heavier feel
-            obj.Material = Enum.Material.Concrete -- Heavier material feel
-            
-            -- Create BodyVelocity for weight effects (if pet moves)
-            local bodyVel = obj:FindFirstChild("TOCHIPYRO_Weight")
-            if not bodyVel then
-                bodyVel = Instance.new("BodyVelocity")
-                bodyVel.Name = "TOCHIPYRO_Weight"
-                bodyVel.MaxForce = Vector3.new(0, math.huge, 0)
-                bodyVel.Velocity = Vector3.new(0, -workspace.Gravity * GRAVITY_MULTIPLIER, 0)
-                bodyVel.Parent = obj
+            -- Simple weight increase
+            if obj.AssemblyMass then
+                obj.AssemblyMass = obj.AssemblyMass * WEIGHT_MULTIPLIER
             end
-            
-            -- Add ground impact effect
-            local function addGroundImpact()
-                local raycast = workspace:Raycast(obj.Position, Vector3.new(0, -5, 0))
-                if raycast then
-                    -- Create dust effect on ground contact
-                    local dust = Instance.new("Explosion")
-                    dust.Position = raycast.Position
-                    dust.BlastRadius = scaleFactor * 10
-                    dust.BlastPressure = 0 -- No damage
-                    dust.Visible = false -- Just the effect
-                    dust.Parent = workspace
-                    
-                    -- Screen shake effect for heavy landing
-                    local camera = workspace.CurrentCamera
-                    if camera then
-                        local originalCFrame = camera.CFrame
-                        for i = 1, 10 do
-                            camera.CFrame = originalCFrame + Vector3.new(
-                                math.random(-1, 1) * scaleFactor * 0.5,
-                                math.random(-1, 1) * scaleFactor * 0.5,
-                                math.random(-1, 1) * scaleFactor * 0.5
-                            )
-                            task.wait(0.05)
-                        end
-                        camera.CFrame = originalCFrame
-                    end
-                end
-            end
-            
-            -- Monitor for landing impacts
-            local lastVelocity = obj.Velocity
-            obj:GetPropertyChangedSignal("Velocity"):Connect(function()
-                if lastVelocity.Y < -10 and obj.Velocity.Y > -5 then
-                    addGroundImpact()
-                end
-                lastVelocity = obj.Velocity
-            end)
             
             -- Force network ownership for better replication
-            if obj.CanSetNetworkOwnership then
-                pcall(function()
+            pcall(function()
+                if obj.CanSetNetworkOwnership then
                     obj:SetNetworkOwner(LocalPlayer)
-                end)
-            end
+                end
+            end)
             
         elseif obj:IsA("SpecialMesh") then
             obj.Scale = obj.Scale * scaleFactor
-        elseif obj:IsA("Decal") or obj:IsA("Texture") then
-            -- Preserve texture scaling
-            if obj.StudsPerTileU then
-                obj.StudsPerTileU = obj.StudsPerTileU * scaleFactor
-                obj.StudsPerTileV = obj.StudsPerTileV * scaleFactor
-            end
-        elseif obj:IsA("Motor6D") or obj:IsA("Weld") or obj:IsA("WeldConstraint") then
-            -- Better joint scaling with weight consideration
-            if obj:IsA("Motor6D") then
-                local c0Pos = obj.C0.Position * scaleFactor
-                local c1Pos = obj.C1.Position * scaleFactor
-                obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
-                obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
-                
-                -- Reduce motor strength for heavier feel
-                if obj:FindFirstChild("MaxTorque") then
-                    obj.MaxTorque = obj.MaxTorque / WEIGHT_MULTIPLIER
-                end
-            elseif obj:IsA("Weld") then
-                local c0Pos = obj.C0.Position * scaleFactor
-                local c1Pos = obj.C1.Position * scaleFactor
-                obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
-                obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
-            end
+            
+        elseif obj:IsA("Motor6D") then
+            -- Scale joint positions
+            local c0Pos = obj.C0.Position * scaleFactor
+            local c1Pos = obj.C1.Position * scaleFactor
+            obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
+            obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
+            
+        elseif obj:IsA("Weld") then
+            -- Scale weld positions
+            local c0Pos = obj.C0.Position * scaleFactor
+            local c1Pos = obj.C1.Position * scaleFactor
+            obj.C0 = CFrame.new(c0Pos) * (obj.C0 - obj.C0.Position)
+            obj.C1 = CFrame.new(c1Pos) * (obj.C1 - obj.C1.Position)
+            
         elseif obj:IsA("Humanoid") then
-            -- Slow down movement for heavy feel
-            obj.WalkSpeed = obj.WalkSpeed / (scaleFactor * 0.8)
-            obj.JumpPower = obj.JumpPower / WEIGHT_MULTIPLIER
+            -- Slow down movement for heavier feel
+            local originalWalkSpeed = obj:GetAttribute("OriginalWalkSpeed") or obj.WalkSpeed
+            local originalJumpPower = obj:GetAttribute("OriginalJumpPower") or obj.JumpPower
+            
+            obj:SetAttribute("OriginalWalkSpeed", originalWalkSpeed)
+            obj:SetAttribute("OriginalJumpPower", originalJumpPower)
+            
+            obj.WalkSpeed = originalWalkSpeed / scaleFactor
+            obj.JumpPower = originalJumpPower / WEIGHT_MULTIPLIER
         end
     end
     
-    -- Add ambient heavy breathing sound effect
+    -- Add simple heavy step sound effect
     task.spawn(function()
-        while model.Parent and model:GetAttribute("TOCHIPYRO_Enlarged") do
-            local sound = Instance.new("Sound")
-            sound.SoundId = "rbxasset://sounds/impact_water.mp3" -- Heavy step sound
-            sound.Volume = 0.3 * scaleFactor
-            sound.Pitch = 0.7 / scaleFactor -- Lower pitch for bigger size
-            sound.Parent = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
-            sound:Play()
-            
-            sound.Ended:Connect(function()
-                sound:Destroy()
-            end)
-            
-            task.wait(2 + math.random(1, 3)) -- Random heavy breathing intervals
-        end
+        local primaryPart = model.PrimaryPart or model:FindFirstChildWhichIsA("BasePart")
+        if not primaryPart then return end
+        
+        local sound = Instance.new("Sound")
+        sound.SoundId = "rbxasset://sounds/impact_wood.ogg"
+        sound.Volume = 0.5
+        sound.Pitch = 0.8 / scaleFactor -- Lower pitch for bigger size
+        sound.Parent = primaryPart
+        sound:Play()
+        
+        -- Clean up sound after playing
+        game:GetService("Debris"):AddItem(sound, 3)
     end)
     
-    -- Mark the model as enlarged with weight
+    -- Mark the model as enlarged
     model:SetAttribute("TOCHIPYRO_Enlarged", true)
     model:SetAttribute("TOCHIPYRO_Scale", scaleFactor)
-    model:SetAttribute("TOCHIPYRO_Weighted", true)
     
-    print("[TOCHIPYRO] Applied realistic weight physics to enlarged pet!")
+    print("[TOCHIPYRO] Applied enlargement with weight effects!")
 end
 
--- Get unique pet ID with better fallbacks
+-- Get unique pet ID
 local function getPetUniqueId(petModel)
     if not petModel then return nil end
     
-    -- Try multiple attribute methods
     local id = petModel:GetAttribute("PetID") or 
                petModel:GetAttribute("UniqueID") or
                petModel:GetAttribute("OwnerUserId") or
@@ -171,31 +111,29 @@ local function getPetUniqueId(petModel)
     
     if id then return tostring(id) end
     
-    -- Fallback to name + some unique identifier
     local owner = petModel:GetAttribute("Owner") or LocalPlayer.Name
     return petModel.Name .. "_" .. owner
 end
 
--- Track pet ID to keep it enlarged persistently
+-- Track pet ID for persistent enlargement
 local function markPetAsEnlarged(pet)
     local id = getPetUniqueId(pet)
     if id then
         enlargedPetIds[id] = true
-        print("[TOCHIPYRO] Marked pet for persistent enlargement:", id)
     end
 end
 
--- Continuous monitoring function for each pet
+-- Monitor pet for re-enlargement
 local function startPetMonitoring(pet)
     local id = getPetUniqueId(pet)
     if not id then return end
     
-    -- Stop existing monitoring for this pet
+    -- Stop existing monitoring
     if petUpdateLoops[id] then
         petUpdateLoops[id]:Disconnect()
     end
     
-    -- Start new monitoring loop
+    -- Start new monitoring
     petUpdateLoops[id] = RunService.Heartbeat:Connect(function()
         if not pet or not pet.Parent then
             petUpdateLoops[id]:Disconnect()
@@ -203,100 +141,94 @@ local function startPetMonitoring(pet)
             return
         end
         
-        -- Check if pet needs re-enlargement and weight physics
+        -- Re-apply enlargement if needed
         if enlargedPetIds[id] and not pet:GetAttribute("TOCHIPYRO_Enlarged") then
-            task.wait(0.1) -- Small delay to ensure stability
+            task.wait(0.1)
             scaleModelWithJoints(pet, ENLARGE_SCALE)
-            print("[TOCHIPYRO] Re-applied enlargement with weight physics to pet:", pet.Name)
         end
     end)
 end
 
--- Enhanced pet detection with better monitoring
+-- Handle new pets
 local function onPetAdded(pet)
     if not pet:IsA("Model") then return end
     
-    -- Wait a moment for the pet to fully load
-    task.wait(0.2)
+    task.wait(0.2) -- Wait for pet to load
     
     local id = getPetUniqueId(pet)
     if not id then return end
     
-    -- Start monitoring this pet
     startPetMonitoring(pet)
     
-    -- If this pet should be enlarged, do it
     if enlargedPetIds[id] then
         task.wait(0.1)
         scaleModelWithJoints(pet, ENLARGE_SCALE)
-        print("[TOCHIPYRO] Auto-enlarged pet on spawn:", pet.Name)
     end
     
-    -- Monitor for when pet gets removed/moved
+    -- Monitor for ancestry changes
     pet.AncestryChanged:Connect(function()
-        if pet.Parent then
-            -- Pet moved to new container, re-monitor
+        if pet.Parent and enlargedPetIds[id] then
             task.wait(0.1)
-            if enlargedPetIds[id] then
-                scaleModelWithJoints(pet, ENLARGE_SCALE)
-            end
+            scaleModelWithJoints(pet, ENLARGE_SCALE)
         end
     end)
 end
 
--- Enhanced container monitoring
-local function setupContainerMonitoring()
-    for _, container in ipairs(petContainers) do
-        if container then
-            container.ChildAdded:Connect(onPetAdded)
-            container.DescendantAdded:Connect(function(descendant)
-                if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
+-- Setup container monitoring
+for _, container in ipairs(petContainers) do
+    if container then
+        container.ChildAdded:Connect(onPetAdded)
+        container.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
+                task.spawn(function()
                     onPetAdded(descendant)
-                end
-            end)
-        end
-    end
-    
-    -- Also monitor player's character for pet equipping
-    local function setupCharacterMonitoring()
-        if LocalPlayer.Character then
-            LocalPlayer.Character.ChildAdded:Connect(onPetAdded)
-            LocalPlayer.Character.DescendantAdded:Connect(function(descendant)
-                if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
-                    onPetAdded(descendant)
-                end
-            end)
-        end
-    end
-    
-    LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
-    if LocalPlayer.Character then
-        setupCharacterMonitoring()
+                end)
+            end
+        end)
     end
 end
 
--- Setup container monitoring
-setupContainerMonitoring()
+-- Monitor player character
+local function setupCharacterMonitoring()
+    if LocalPlayer.Character then
+        LocalPlayer.Character.ChildAdded:Connect(onPetAdded)
+        LocalPlayer.Character.DescendantAdded:Connect(function(descendant)
+            if descendant:IsA("Model") and descendant:FindFirstChildWhichIsA("BasePart") then
+                task.spawn(function()
+                    onPetAdded(descendant)
+                end)
+            end
+        end)
+    end
+end
 
--- Find the currently held/equipped pet model
+LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
+if LocalPlayer.Character then
+    setupCharacterMonitoring()
+end
+
+-- Find current pet
 local function getHeldPet()
     local char = LocalPlayer.Character
     if not char then return nil end
     
-    -- Check character for pet models
+    -- Check character for pets
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") and not obj:FindFirstChildOfClass("Humanoid") and obj ~= char then
             return obj
         end
     end
     
-    -- Check garden slots if available
+    -- Check garden slots
     local gardenSlots = workspace:FindFirstChild("GardenSlots")
     if gardenSlots then
         for _, slot in ipairs(gardenSlots:GetChildren()) do
             for _, obj in ipairs(slot:GetDescendants()) do
-                if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") and obj:GetAttribute("Owner") == LocalPlayer.Name then
-                    return obj
+                if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") then
+                    local owner = obj:GetAttribute("Owner") or obj:GetAttribute("OwnerUserId")
+                    if owner == LocalPlayer.Name or owner == LocalPlayer.UserId then
+                        return obj
+                    end
                 end
             end
         end
@@ -305,7 +237,7 @@ local function getHeldPet()
     return nil
 end
 
--- Enhanced enlargement function
+-- Main enlargement function
 local function enlargeCurrentHeldPet()
     local pet = getHeldPet()
     if pet then
@@ -313,7 +245,7 @@ local function enlargeCurrentHeldPet()
         markPetAsEnlarged(pet)
         startPetMonitoring(pet)
         
-        -- Force a small position change to trigger replication
+        -- Force position update for replication
         if pet.PrimaryPart then
             local originalCFrame = pet.PrimaryPart.CFrame
             pet.PrimaryPart.CFrame = originalCFrame + Vector3.new(0, 0.01, 0)
@@ -321,9 +253,9 @@ local function enlargeCurrentHeldPet()
             pet.PrimaryPart.CFrame = originalCFrame
         end
         
-        print("[TOCHIPYRO] Enlarged pet with realistic weight:", pet.Name)
+        print("[TOCHIPYRO] Enlarged pet with weight effects:", pet.Name)
     else
-        -- Try to find pets in other locations
+        -- Search in containers
         local foundPet = false
         for _, container in ipairs(petContainers) do
             if container then
@@ -334,7 +266,6 @@ local function enlargeCurrentHeldPet()
                             scaleModelWithJoints(obj, ENLARGE_SCALE)
                             markPetAsEnlarged(obj)
                             startPetMonitoring(obj)
-                            print("[TOCHIPYRO] Found and enlarged pet with weight physics:", obj.Name)
                             foundPet = true
                             break
                         end
@@ -345,13 +276,12 @@ local function enlargeCurrentHeldPet()
         end
         
         if not foundPet then
-            warn("[TOCHIPYRO] No pet found to enlarge. Make sure you have a pet equipped or in your garden.")
+            warn("[TOCHIPYRO] No pet found to enlarge.")
         end
     end
 end
 
--- GUI Creation (keeping original design)
-
+-- GUI Creation
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TOCHIPYRO_Script"
 ScreenGui.Parent = game.CoreGui
@@ -384,7 +314,7 @@ SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 55)
 SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SizeButton.TextColor3 = Color3.new(1, 1, 1)
-SizeButton.Text = "Size Enlarge"
+SizeButton.Text = "Size Enlarge (+ Weight)"
 SizeButton.Font = Enum.Font.GothamBold
 SizeButton.TextScaled = true
 SizeButton.Parent = MainFrame
@@ -442,7 +372,9 @@ end)
 CloseButton.MouseButton1Click:Connect(function()
     -- Clean up monitoring loops
     for id, connection in pairs(petUpdateLoops) do
-        connection:Disconnect()
+        if connection then
+            connection:Disconnect()
+        end
     end
     ScreenGui:Destroy()
 end)
@@ -451,4 +383,4 @@ BypassButton.MouseButton1Click:Connect(function()
     print("[TOCHIPYRO] Bypass pressed (placeholder).")
 end)
 
-print("[TOCHIPYRO] Enhanced pet enlarger loaded with improved visibility and persistence!")
+print("[TOCHIPYRO] Pet enlarger with simple weight effects loaded!")
