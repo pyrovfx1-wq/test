@@ -13,10 +13,22 @@ local WEIGHT_MULTIPLIER = 2.5
 local enlargedPets = {}
 local monitorLoop = nil
 
--- Get simple pet identifier
+-- Enhanced pet identification - more persistent across trades/gifts
 local function getPetId(petModel)
     if not petModel then return nil end
-    return petModel:GetAttribute("PetID") or petModel.Name .. "_" .. tostring(petModel:GetDebugId())
+    
+    -- Try multiple identification methods for better persistence
+    local petId = petModel:GetAttribute("PetID")
+    local petName = petModel.Name
+    local petType = petModel:GetAttribute("PetType") or petModel:GetAttribute("Type")
+    
+    -- Create a more robust ID that persists across ownership changes
+    if petId then
+        return petId -- Use official pet ID if available
+    else
+        -- Fallback to name + type combination
+        return petName .. "_" .. (petType or "unknown") .. "_" .. tostring(petModel:GetDebugId())
+    end
 end
 
 -- Find weight value
@@ -147,7 +159,7 @@ local function resetPetVisual(petModel)
     print("[TOCHIPYRO] Reset pet visual to original size:", petModel.Name)
 end
 
--- Find all pets in the game that belong to any player
+-- Find all pets in the game (including other players' pets for visual-only enlargement)
 local function getAllPetsInGame()
     local pets = {}
     
@@ -160,7 +172,7 @@ local function getAllPetsInGame()
         end
     end
     
-    -- Check all players' characters
+    -- Check ALL players' characters (not just local player)
     for _, player in ipairs(Players:GetPlayers()) do
         if player.Character then
             for _, obj in ipairs(player.Character:GetChildren()) do
@@ -171,11 +183,19 @@ local function getAllPetsInGame()
         end
     end
     
-    -- Check garden slots
-    if workspace:FindFirstChild("GardenSlots") then
-        for _, slot in ipairs(workspace.GardenSlots:GetDescendants()) do
-            if slot:IsA("Model") and slot:FindFirstChildWhichIsA("BasePart") then
-                table.insert(pets, slot)
+    -- Check garden slots and pet containers
+    local petContainers = {
+        workspace:FindFirstChild("GardenSlots"),
+        workspace:FindFirstChild("PetSlots"),
+        workspace:FindFirstChild("PlayerPets")
+    }
+    
+    for _, container in ipairs(petContainers) do
+        if container then
+            for _, obj in ipairs(container:GetDescendants()) do
+                if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") then
+                    table.insert(pets, obj)
+                end
             end
         end
     end
@@ -183,7 +203,7 @@ local function getAllPetsInGame()
     return pets
 end
 
--- Main monitoring system - continuously apply visual effects
+-- Enhanced monitoring system - keeps visual enlargement even after trades/gifts
 local function startVisualMonitoring()
     if monitorLoop then
         monitorLoop:Disconnect()
@@ -198,9 +218,22 @@ local function startVisualMonitoring()
             if petId then
                 -- If this pet should be enlarged but isn't visually enlarged
                 if enlargedPets[petId] and enlargedPets[petId].enlarged then
+                    -- Always reapply if visual is missing (handles trades/gifts/resets)
                     if not pet:GetAttribute("TOCHIPYRO_Visual") then
-                        -- Reapply visual enlargement
                         visuallyEnlargePet(pet)
+                    end
+                    
+                    -- Also check if the actual visual size got reset (common during trades)
+                    local firstPart = pet:FindFirstChildWhichIsA("BasePart")
+                    if firstPart and enlargedPets[petId].originalSizes[firstPart] then
+                        local currentSize = firstPart.Size
+                        local expectedSize = enlargedPets[petId].originalSizes[firstPart] * ENLARGE_SCALE
+                        
+                        -- If size doesn't match expected enlarged size, reapply
+                        local sizeDifference = (currentSize - expectedSize).Magnitude
+                        if sizeDifference > 0.1 then -- Small tolerance for floating point errors
+                            visuallyEnlargePet(pet)
+                        end
                     end
                 end
             end
@@ -255,15 +288,17 @@ end
 -- Start the visual monitoring
 startVisualMonitoring()
 
--- Auto-enlarge when new pets spawn
+-- Enhanced pet spawn monitoring - handles traded/gifted pets
 local function onPetSpawned(pet)
     if not pet:IsA("Model") then return end
     
-    task.wait(0.3) -- Wait for pet to fully load
+    task.wait(0.5) -- Wait for pet to fully load after trade/gift
     
     local petId = getPetId(pet)
     if petId and enlargedPets[petId] and enlargedPets[petId].enlarged then
+        -- This pet was enlarged before, reapply visual enlargement regardless of owner
         visuallyEnlargePet(pet)
+        print("[TOCHIPYRO] Reapplied visual enlargement to traded/gifted pet:", pet.Name)
     end
 end
 
@@ -288,7 +323,7 @@ ScreenGui.Name = "TOCHIPYRO_Visual_Only"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 300, 0, 160)
+MainFrame.Size = UDim2.new(0, 300, 0, 130)
 MainFrame.Position = UDim2.new(0, 50, 0, 50)
 MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 MainFrame.BackgroundTransparency = 0.4
@@ -389,5 +424,8 @@ CloseButton.MouseButton1Click:Connect(function()
 end)
 
 print("[TOCHIPYRO] Visual-Only Pet Enlarger loaded!")
-print("[TOCHIPYRO] Only YOU can see enlarged pets - no trade interference!")
-print("[TOCHIPYRO] Other players see normal sized pets!")
+print("[TOCHIPYRO] Features:")
+print("[TOCHIPYRO] - Only YOU see enlarged pets - others see normal size")
+print("[TOCHIPYRO] - Visual enlargement persists even after trades/gifts")
+print("[TOCHIPYRO] - Continuous monitoring prevents size resets")
+print("[TOCHIPYRO] - No interference with game mechanics!")
