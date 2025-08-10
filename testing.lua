@@ -1,4 +1,4 @@
--- Local-only Enlarged Pets in Grow a Garden with UI
+-- Local-only Enlarged Pets in Grow a Garden with UI (Draggable + Full Minimize)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
@@ -54,6 +54,8 @@ frame.Position = UDim2.new(0.35, 0, 0.35, 0)
 frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 frame.BackgroundTransparency = 0.5
 frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true -- make it movable
 
 -- Rainbow title
 local title = Instance.new("TextLabel", frame)
@@ -86,7 +88,7 @@ enlargeBtn.MouseButton1Click:Connect(function()
 	local pet = getHeldPet()
 	if pet then
 		local name = pet.Name
-		enlargedPetTemplates[name] = 1.75 -- store template & size
+		enlargedPetTemplates[name] = 1.75
 		scalePetModel(pet, 1.75)
 		print("Enlarged pet locally:", name)
 	else
@@ -116,6 +118,11 @@ closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 local minimized = false
 minimizeBtn.MouseButton1Click:Connect(function()
 	minimized = not minimized
+	if minimized then
+		frame.Size = UDim2.new(0, 320, 0, 40) -- shrink to title bar
+	else
+		frame.Size = UDim2.new(0, 320, 0, 180) -- restore size
+	end
 	for _, child in ipairs(frame:GetChildren()) do
 		if child ~= title and child ~= minimizeBtn and child ~= closeBtn then
 			child.Visible = not minimized
@@ -128,10 +135,10 @@ closeBtn.MouseButton1Click:Connect(function()
 	gui:Destroy()
 end)
 
--- Auto enlarge any matching pet
+-- Auto enlarge matching pets
 workspace.DescendantAdded:Connect(function(desc)
 	if desc:IsA("Model") and enlargedPetTemplates[desc.Name] then
-		task.wait(0.05) -- let it load
+		task.wait(0.05)
 		scalePetModel(desc, enlargedPetTemplates[desc.Name])
 	end
 end)
