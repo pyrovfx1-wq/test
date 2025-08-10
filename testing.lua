@@ -147,7 +147,7 @@ frame.BorderSizePixel = 0
 frame.ZIndex = 5
 
 -- TitleBar (use TextButton to capture input for dragging)
-local titleBar = Instance.new("", frame)
+local titleBar = Instance.new("TextButton", frame)
 titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 40)
 titleBar.Position = UDim2.new(0, 0, 0, 0)
