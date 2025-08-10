@@ -1,4 +1,4 @@
--- TOCHIPYRO Enhanced Pet Enlarger for Grow a Garden
+-- TOCHIPYRO Enhanced Pet Enlarger with Trade Protection for Grow a Garden
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
@@ -9,75 +9,83 @@ local UserInputService = game:GetService("UserInputService")
 local ENLARGE_SCALE = 1.75
 local WEIGHT_MULTIPLIER = 2.5
 
--- Store pet IDs enlarged
-local enlargedPetIds = {}
+-- Store pet data with more robust tracking
+local enlargedPetData = {}
 local petUpdateLoops = {}
 local originalWeights = {}
--- Store original sizes for each pet part to detect resets
-local originalPartSizes = {}
+local petOwnershipHistory = {}
 
--- Store original part sizes for reset detection
-local function storeOriginalSizes(petModel)
-    local id = getPetUniqueId(petModel)
-    if not id then return end
+-- Enhanced pet identification system
+local function getExtendedPetId(petModel)
+    if not petModel then return nil end
     
-    originalPartSizes[id] = {}
-    for _, obj in ipairs(petModel:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            originalPartSizes[id][obj] = obj.Size
-        end
-    end
-end
-
--- Check if pet has been visually reset (size returned to normal)
-local function isPetVisuallyReset(petModel)
-    local id = getPetUniqueId(petModel)
-    if not id or not originalPartSizes[id] then return false end
+    -- Try multiple identification methods
+    local petId = petModel:GetAttribute("PetID") 
+    local ownerId = petModel:GetAttribute("OwnerUserId") or petModel:GetAttribute("Owner")
+    local petName = petModel.Name
+    local petType = petModel:GetAttribute("PetType") or petModel:GetAttribute("Type")
     
-    local resetCount = 0
-    local totalParts = 0
+    -- Create composite ID for better tracking
+    local compositeId = string.format("%s_%s_%s_%s", 
+        petId or "unknown", 
+        ownerId or "noowner", 
+        petName or "noname", 
+        petType or "notype"
+    )
     
-    for part, originalSize in pairs(originalPartSizes[id]) do
-        if part and part.Parent then
-            totalParts = totalParts + 1
-            local expectedSize = originalSize * ENLARGE_SCALE
-            local currentSize = part.Size
-            -- Check if size is significantly different from expected enlarged size (tolerance of 0.5)
-            if math.abs(currentSize.X - expectedSize.X) > 0.5 or 
-               math.abs(currentSize.Y - expectedSize.Y) > 0.5 or 
-               math.abs(currentSize.Z - expectedSize.Z) > 0.5 then
-                resetCount = resetCount + 1
-            end
-        end
-    end
-    
-    -- If more than 50% of parts are reset, consider the pet reset
-    return totalParts > 0 and (resetCount / totalParts) > 0.5
+    return compositeId, {
+        id = petId,
+        owner = ownerId,
+        name = petName,
+        type = petType,
+        model = petModel
+    }
 end
 
 -- Deep find Weight NumberValue inside pet model
 local function findWeightNumberValue(model)
     for _, obj in ipairs(model:GetDescendants()) do
-        if obj.Name:lower() == "weight" and obj:IsA("NumberValue") then
+        if obj.Name:lower():find("weight") and obj:IsA("NumberValue") then
             return obj
         end
     end
     return nil
 end
 
--- Get unique pet ID fallback function
-local function getPetUniqueId(petModel)
-    if not petModel then return nil end
-    return petModel:GetAttribute("PetID") or petModel:GetAttribute("OwnerUserId") or petModel.Name
-end
-
--- Scale pet parts and joints properly
+-- Enhanced scaling with better joint preservation
 local function scaleModelWithJoints(model, scaleFactor)
-    if not model or not model.Parent then return end
+    if model:GetAttribute("TOCHIPYRO_Processing") then
+        return -- Prevent recursive scaling
+    end
     
-    -- Clear any existing scale attribute to avoid conflicts
-    model:SetAttribute("TOCHIPYRO_Enlarged", nil)
+    model:SetAttribute("TOCHIPYRO_Processing", true)
     
+    -- Store original sizes if not already stored
+    local compositeId, petData = getExtendedPetId(model)
+    if compositeId and not enlargedPetData[compositeId] then
+        enlargedPetData[compositeId] = {
+            originalSizes = {},
+            originalScales = {},
+            originalC0 = {},
+            originalC1 = {},
+            petData = petData,
+            enlarged = false
+        }
+        
+        -- Store original values
+        for _, obj in ipairs(model:GetDescendants()) do
+            if obj:IsA("BasePart") then
+                enlargedPetData[compositeId].originalSizes[obj] = obj.Size
+            elseif obj:IsA("SpecialMesh") then
+                enlargedPetData[compositeId].originalScales[obj] = obj.Scale
+            elseif obj:IsA("Motor6D") then
+                enlargedPetData[compositeId].originalC0[obj] = obj.C0
+                enlargedPetData[compositeId].originalC1[obj] = obj.C1
+            end
+        end
+    end
+    
+    -- Apply scaling
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Size = obj.Size * scaleFactor
@@ -86,20 +94,23 @@ local function scaleModelWithJoints(model, scaleFactor)
         elseif obj:IsA("Motor6D") then
             obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
             obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
-        elseif obj:IsA("Weld") then
-            obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
-            obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
         end
     end
 
-    -- Set attributes after scaling
     model:SetAttribute("TOCHIPYRO_Enlarged", true)
     model:SetAttribute("TOCHIPYRO_Scale", scaleFactor)
+    model:SetAttribute("TOCHIPYRO_Timestamp", tick())
     
-    print("[TOCHIPYRO] Successfully scaled model:", model.Name)
+    if compositeId then
+        enlargedPetData[compositeId].enlarged = true
+    end
+    
+    model:SetAttribute("TOCHIPYRO_Processing", false)
+    
+    print("[TOCHIPYRO] Successfully scaled pet:", model.Name)
 end
 
--- Increase pet weight in the model and GUI
+-- Enhanced weight modification
 local function increaseWeight(petModel)
     local weightValue = findWeightNumberValue(petModel)
     if not weightValue then
@@ -107,219 +118,240 @@ local function increaseWeight(petModel)
         return
     end
 
-    local id = getPetUniqueId(petModel)
-    if not id then
+    local compositeId = getExtendedPetId(petModel)
+    if not compositeId then
         warn("[TOCHIPYRO] Pet missing unique ID, skipping weight update")
         return
     end
 
-    -- Store original weight once
-    if not originalWeights[id] then
-        originalWeights[id] = weightValue.Value
+    -- Store original weight
+    if not originalWeights[compositeId] then
+        originalWeights[compositeId] = weightValue.Value
     end
 
-    local newWeight = originalWeights[id] * WEIGHT_MULTIPLIER
+    local newWeight = originalWeights[compositeId] * WEIGHT_MULTIPLIER
     weightValue.Value = newWeight
+    
+    -- Set multiple weight attributes for redundancy
     petModel:SetAttribute("Weight", newWeight)
     petModel:SetAttribute("weight", newWeight)
+    petModel:SetAttribute("TOCHIPYRO_Weight", newWeight)
+    petModel:SetAttribute("TOCHIPYRO_OriginalWeight", originalWeights[compositeId])
 
-    print(string.format("[TOCHIPYRO] Weight updated from %.2f to %.2f for pet %s", originalWeights[id], newWeight, petModel.Name))
-
-    -- Try to refresh GUI - best effort
-    local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
-    if playerGui then
-        for _, gui in ipairs(playerGui:GetDescendants()) do
-            if (gui:IsA("TextLabel") or gui:IsA("TextBox")) and gui.Text:lower():find("kg") then
-                gui.Text = string.gsub(gui.Text, "%d+%.?%d*", string.format("%.1f", newWeight))
-            end
-        end
-    end
+    print(string.format("[TOCHIPYRO] Weight updated from %.2f to %.2f for pet %s", originalWeights[compositeId], newWeight, petModel.Name))
 end
 
--- Mark pet ID as enlarged for persistence
-local function markPetAsEnlarged(petModel)
-    local id = getPetUniqueId(petModel)
-    if id then
-        enlargedPetIds[id] = true
+-- Enhanced pet monitoring with ownership tracking
+local function startEnhancedPetMonitor(petModel)
+    local compositeId, petData = getExtendedPetId(petModel)
+    if not compositeId then return end
+
+    -- Store ownership history
+    petOwnershipHistory[compositeId] = {
+        currentOwner = petData.owner,
+        previousOwner = petOwnershipHistory[compositeId] and petOwnershipHistory[compositeId].currentOwner,
+        lastSeen = tick(),
+        model = petModel
+    }
+
+    if petUpdateLoops[compositeId] then
+        petUpdateLoops[compositeId]:Disconnect()
     end
-end
 
--- Monitoring pet to reapply scale + weight when respawned or reequipped
-local function startPetMonitor(petModel)
-    local id = getPetUniqueId(petModel)
-    if not id then return end
-
-    if petUpdateLoops[id] then
-        petUpdateLoops[id]:Disconnect()
-        petUpdateLoops[id] = nil
-    end
-
-    petUpdateLoops[id] = RunService.Heartbeat:Connect(function()
+    petUpdateLoops[compositeId] = RunService.Heartbeat:Connect(function()
         if not petModel or not petModel.Parent then
-            if petUpdateLoops[id] then
-                petUpdateLoops[id]:Disconnect()
-                petUpdateLoops[id] = nil
+            if petUpdateLoops[compositeId] then
+                petUpdateLoops[compositeId]:Disconnect()
+                petUpdateLoops[compositeId] = nil
             end
             return
         end
 
-        if enlargedPetIds[id] then
-            -- Only check for reset every 30 frames to avoid performance issues
-            if tick() % 1 < 0.03 then -- Check roughly once per second
-                local needsReapply = not petModel:GetAttribute("TOCHIPYRO_Enlarged") or isPetVisuallyReset(petModel)
-                
-                if needsReapply then
-                    print("[TOCHIPYRO] Detected pet reset, reapplying enlargement...")
-                    -- Store original sizes before reapplying if not already stored
-                    if not originalPartSizes[id] then
-                        storeOriginalSizes(petModel)
-                    end
-                    -- reapply scale and weight if lost
-                    scaleModelWithJoints(petModel, ENLARGE_SCALE)
-                    increaseWeight(petModel)
-                    print("[TOCHIPYRO] Reapplied enlargement to pet:", petModel.Name)
-                end
+        -- Check if pet needs re-enlargement
+        local shouldBeEnlarged = enlargedPetData[compositeId] and enlargedPetData[compositeId].enlarged
+        local isCurrentlyEnlarged = petModel:GetAttribute("TOCHIPYRO_Enlarged")
+        local lastTimestamp = petModel:GetAttribute("TOCHIPYRO_Timestamp") or 0
+        
+        -- Re-enlarge if needed (handles trade resets)
+        if shouldBeEnlarged and (not isCurrentlyEnlarged or tick() - lastTimestamp > 1) then
+            task.wait(0.1) -- Small delay to let the game settle
+            scaleModelWithJoints(petModel, ENLARGE_SCALE)
+            increaseWeight(petModel)
+            print("[TOCHIPYRO] Reapplied enlargement after reset/trade:", petModel.Name)
+        end
+        
+        -- Monitor for ownership changes
+        local currentOwner = petModel:GetAttribute("OwnerUserId") or petModel:GetAttribute("Owner")
+        if currentOwner and petOwnershipHistory[compositeId].currentOwner ~= currentOwner then
+            print("[TOCHIPYRO] Detected ownership change for pet:", petModel.Name)
+            petOwnershipHistory[compositeId].previousOwner = petOwnershipHistory[compositeId].currentOwner
+            petOwnershipHistory[compositeId].currentOwner = currentOwner
+            
+            -- Re-apply enlargement after ownership change
+            if shouldBeEnlarged then
+                task.wait(0.5) -- Longer wait for trade completion
+                scaleModelWithJoints(petModel, ENLARGE_SCALE)
+                increaseWeight(petModel)
+                print("[TOCHIPYRO] Reapplied enlargement after ownership change:", petModel.Name)
             end
         end
     end)
 end
 
--- Find currently held pet model (try character descendants & garden slots)
-local function getHeldPet()
+-- Enhanced pet finding with multiple search locations
+local function getAllPets()
+    local pets = {}
     local char = LocalPlayer.Character
-    if not char then return nil end
-
-    for _, obj in ipairs(char:GetDescendants()) do
-        if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") and not obj:FindFirstChildOfClass("Humanoid") and obj ~= char then
-            return obj
+    
+    -- Search character
+    if char then
+        for _, obj in ipairs(char:GetDescendants()) do
+            if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") and not obj:FindFirstChildOfClass("Humanoid") and obj ~= char then
+                table.insert(pets, obj)
+            end
         end
     end
-
-    local gardenSlots = workspace:FindFirstChild("GardenSlots")
-    if gardenSlots then
-        for _, slot in ipairs(gardenSlots:GetChildren()) do
-            for _, obj in ipairs(slot:GetDescendants()) do
+    
+    -- Search workspace locations
+    local searchLocations = {
+        workspace:FindFirstChild("Pets"),
+        workspace:FindFirstChild("PetSlots"),
+        workspace:FindFirstChild("GardenSlots"),
+        workspace:FindFirstChild("PlayerPets"),
+        workspace
+    }
+    
+    for _, location in pairs(searchLocations) do
+        if location then
+            for _, obj in ipairs(location:GetDescendants()) do
                 if obj:IsA("Model") and obj:FindFirstChildWhichIsA("BasePart") then
                     local owner = obj:GetAttribute("Owner") or obj:GetAttribute("OwnerUserId")
-                    if owner == LocalPlayer.Name or owner == tostring(LocalPlayer.UserId) then
-                        return obj
+                    if owner == LocalPlayer.Name or owner == tostring(LocalPlayer.UserId) or not owner then
+                        table.insert(pets, obj)
                     end
                 end
             end
         end
     end
-
-    return nil
+    
+    return pets
 end
 
--- Enlarge current held pet (scale + weight + persist)
-local function enlargeCurrentPet()
-    local pet = getHeldPet()
-    if not pet then
-        warn("[TOCHIPYRO] No held pet found to enlarge!")
-        return
-    end
-
-    print("[TOCHIPYRO] Found pet to enlarge:", pet.Name)
+-- Enhanced pet enlargement function
+local function enlargeAllFoundPets()
+    local pets = getAllPets()
+    local enlargedCount = 0
     
-    -- Store original sizes before enlarging (only if not already stored)
-    local id = getPetUniqueId(pet)
-    if id and not originalPartSizes[id] then
-        storeOriginalSizes(pet)
-        print("[TOCHIPYRO] Stored original sizes for pet:", pet.Name)
+    for _, pet in pairs(pets) do
+        local compositeId = getExtendedPetId(pet)
+        if compositeId then
+            scaleModelWithJoints(pet, ENLARGE_SCALE)
+            increaseWeight(pet)
+            startEnhancedPetMonitor(pet)
+            enlargedCount = enlargedCount + 1
+            
+            -- Small delay between pets to prevent overwhelming
+            task.wait(0.1)
+        end
     end
     
-    scaleModelWithJoints(pet, ENLARGE_SCALE)
-    increaseWeight(pet)
-    markPetAsEnlarged(pet)
-    startPetMonitor(pet)
-
-    print("[TOCHIPYRO] Successfully enlarged pet:", pet.Name)
+    print(string.format("[TOCHIPYRO] Enlarged %d pets", enlargedCount))
+    return enlargedCount
 end
 
--- Monitor pets added to workspace/garden/pet slots to auto-enlarge if previously marked
+-- Global pet monitoring for automatic enlargement
 local function onPetAdded(pet)
     if not pet:IsA("Model") then return end
 
-    task.wait(0.1) -- allow for initial setup
+    task.wait(0.2) -- Allow for proper initialization
 
-    local id = getPetUniqueId(pet)
-    if not id then return end
+    local compositeId, petData = getExtendedPetId(pet)
+    if not compositeId then return end
 
-    startPetMonitor(pet)
+    startEnhancedPetMonitor(pet)
 
-    if enlargedPetIds[id] then
-        -- Store original sizes before auto-enlarging
-        storeOriginalSizes(pet)
+    -- Auto-enlarge if this pet was previously enlarged
+    if enlargedPetData[compositeId] and enlargedPetData[compositeId].enlarged then
+        task.wait(0.3) -- Additional wait for trade/respawn scenarios
         scaleModelWithJoints(pet, ENLARGE_SCALE)
         increaseWeight(pet)
-        print("[TOCHIPYRO] Auto-enlarged pet on spawn:", pet.Name)
+        print("[TOCHIPYRO] Auto-enlarged returning pet:", pet.Name)
     end
 end
 
--- Connect pet add events on containers
+-- Set up global monitoring
 local petContainers = {
     workspace,
     workspace:FindFirstChild("Pets"),
     workspace:FindFirstChild("PetSlots"),
     workspace:FindFirstChild("GardenSlots"),
+    workspace:FindFirstChild("PlayerPets")
 }
+
 for _, container in pairs(petContainers) do
     if container then
         container.ChildAdded:Connect(onPetAdded)
+        container.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Model") then
+                onPetAdded(obj)
+            end
+        end)
     end
 end
 
--- Character pet add monitoring
+-- Character monitoring
 local function setupCharacterMonitoring()
     if LocalPlayer.Character then
         LocalPlayer.Character.ChildAdded:Connect(onPetAdded)
+        LocalPlayer.Character.DescendantAdded:Connect(function(obj)
+            if obj:IsA("Model") then
+                onPetAdded(obj)
+            end
+        end)
     end
 end
 
 LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
 setupCharacterMonitoring()
 
--- Create movable GUI with minimize function
-
+-- Create Enhanced GUI
 local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "TOCHIPYRO_Script"
+ScreenGui.Name = "TOCHIPYRO_Enhanced_Script"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 280, 0, 140)
-MainFrame.Position = UDim2.new(0, 50, 0, 50) -- Start at top-left instead of center
+MainFrame.Size = UDim2.new(0, 300, 0, 200)
+MainFrame.Position = UDim2.new(0, 50, 0, 50)
 MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
-MainFrame.BackgroundTransparency = 0.5
+MainFrame.BackgroundTransparency = 0.3
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 MainFrame.Active = true
-MainFrame.Draggable = true -- Make the frame draggable
+MainFrame.Draggable = true
 
--- Title Bar for better dragging experience
+-- Title Bar
 local TitleBar = Instance.new("Frame")
 TitleBar.Size = UDim2.new(1, 0, 0, 40)
 TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-TitleBar.BackgroundTransparency = 0.3
+TitleBar.BackgroundTransparency = 0.2
 TitleBar.BorderSizePixel = 0
 TitleBar.Parent = MainFrame
-TitleBar.Active = true
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -80, 1, 0) -- Leave space for minimize button
+Title.Size = UDim2.new(1, -80, 1, 0)
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
-Title.Text = "TOCHIPYRO Script"
-Title.TextSize = 20
+Title.Text = "TOCHIPYRO Enhanced"
+Title.TextSize = 18
 Title.Parent = TitleBar
 
--- Rainbow text effect
+-- Rainbow title effect
 spawn(function()
     while Title and Title.Parent do
         for h = 0, 1, 0.01 do
             if Title and Title.Parent then
                 Title.TextColor3 = Color3.fromHSV(h, 1, 1)
-                task.wait(0.02)
+                task.wait(0.03)
             else
                 break
             end
@@ -349,49 +381,76 @@ CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 16
 CloseButton.Parent = TitleBar
 
--- Content Frame (what gets hidden/shown)
+-- Content Frame
 local ContentFrame = Instance.new("Frame")
 ContentFrame.Size = UDim2.new(1, 0, 1, -40)
 ContentFrame.Position = UDim2.new(0, 0, 0, 40)
 ContentFrame.BackgroundTransparency = 1
 ContentFrame.Parent = MainFrame
 
-local SizeButton = Instance.new("TextButton")
-SizeButton.Size = UDim2.new(1, -20, 0, 40)
-SizeButton.Position = UDim2.new(0, 10, 0, 10)
-SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-SizeButton.TextColor3 = Color3.new(1, 1, 1)
-SizeButton.Text = "Size Enlarge + Weight"
-SizeButton.Font = Enum.Font.GothamBold
-SizeButton.TextScaled = true
-SizeButton.Parent = ContentFrame
+-- Enlarge Button
+local EnlargeButton = Instance.new("TextButton")
+EnlargeButton.Size = UDim2.new(1, -20, 0, 35)
+EnlargeButton.Position = UDim2.new(0, 10, 0, 10)
+EnlargeButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+EnlargeButton.TextColor3 = Color3.new(1, 1, 1)
+EnlargeButton.Text = "Enlarge All Pets"
+EnlargeButton.Font = Enum.Font.GothamBold
+EnlargeButton.TextScaled = true
+EnlargeButton.Parent = ContentFrame
 
 -- Status Label
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 30)
-StatusLabel.Position = UDim2.new(0, 10, 0, 60)
+StatusLabel.Size = UDim2.new(1, -20, 0, 25)
+StatusLabel.Position = UDim2.new(0, 10, 0, 55)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Ready to enlarge pets!"
+StatusLabel.Text = "Enhanced anti-trade reset ready!"
 StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
-StatusLabel.TextSize = 14
+StatusLabel.TextSize = 12
 StatusLabel.TextScaled = true
 StatusLabel.Parent = ContentFrame
 
--- Minimize/Restore functionality
+-- Info Label
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Size = UDim2.new(1, -20, 0, 60)
+InfoLabel.Position = UDim2.new(0, 10, 0, 90)
+InfoLabel.BackgroundTransparency = 1
+InfoLabel.Font = Enum.Font.Gotham
+InfoLabel.Text = "Features:\n• Trade-resistant scaling\n• Auto re-enlargement\n• Enhanced pet tracking"
+InfoLabel.TextColor3 = Color3.fromRGB(200, 200, 255)
+InfoLabel.TextSize = 11
+InfoLabel.TextScaled = true
+InfoLabel.TextYAlignment = Enum.TextYAlignment.Top
+InfoLabel.Parent = ContentFrame
+
+-- Button functionality
+EnlargeButton.MouseButton1Click:Connect(function()
+    local count = enlargeAllFoundPets()
+    StatusLabel.Text = string.format("Enlarged %d pets with protection!", count)
+    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    
+    task.spawn(function()
+        task.wait(3)
+        if StatusLabel and StatusLabel.Parent then
+            StatusLabel.Text = "Enhanced anti-trade reset active!"
+            StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+        end
+    end)
+end)
+
+-- Minimize functionality
 local isMinimized = false
 local originalSize = MainFrame.Size
 
 MinimizeButton.MouseButton1Click:Connect(function()
     if isMinimized then
-        -- Restore
         MainFrame.Size = originalSize
         ContentFrame.Visible = true
         MinimizeButton.Text = "_"
         isMinimized = false
     else
-        -- Minimize
-        MainFrame.Size = UDim2.new(0, 280, 0, 40)
+        MainFrame.Size = UDim2.new(0, 300, 0, 40)
         ContentFrame.Visible = false
         MinimizeButton.Text = "+"
         isMinimized = true
@@ -400,47 +459,21 @@ end)
 
 -- Close functionality
 CloseButton.MouseButton1Click:Connect(function()
+    -- Clean up all monitoring loops
+    for id, loop in pairs(petUpdateLoops) do
+        if loop then
+            loop:Disconnect()
+        end
+    end
     ScreenGui:Destroy()
 end)
 
--- Button functionality
-SizeButton.MouseButton1Click:Connect(function()
-    enlargeCurrentPet()
-    StatusLabel.Text = "Pet enlarged!"
-    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    
-    -- Reset status after 2 seconds
-    task.wait(2)
-    if StatusLabel and StatusLabel.Parent then
-        StatusLabel.Text = "Ready to enlarge pets!"
-        StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
-    end
+-- Auto-enlarge existing pets on script load
+task.spawn(function()
+    task.wait(2) -- Wait for game to load
+    print("[TOCHIPYRO] Auto-scanning for existing pets...")
+    enlargeAllFoundPets()
 end)
 
--- Make the GUI draggable by the title bar
-local dragging = false
-local dragStart = nil
-local startPos = nil
-
-TitleBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-TitleBar.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
-
-print("[TOCHIPYRO] Pet enlarger with movable GUI loaded!")
+print("[TOCHIPYRO] Enhanced Pet Enlarger with Trade Protection loaded!")
+print("[TOCHIPYRO] Features: Anti-reset scaling, ownership tracking, enhanced monitoring")
