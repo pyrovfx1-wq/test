@@ -1,24 +1,24 @@
--- TOCHIPYRO Pet Size Visual Script for Grow a Garden
+-- TOCHIPYRO Script for Grow a Garden
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
--- Rainbow color generator
+-- Rainbow Color Function
 local function rainbowColor(t)
-    return Color3.fromRGB(
-        math.sin(t * 2) * 127 + 128,
-        math.sin(t * 2 + 2) * 127 + 128,
-        math.sin(t * 2 + 4) * 127 + 128
-    )
+    local r = math.sin(t * 2) * 127 + 128
+    local g = math.sin(t * 2 + 2) * 127 + 128
+    local b = math.sin(t * 2 + 4) * 127 + 128
+    return Color3.fromRGB(r, g, b)
 end
 
--- Find held pet
+-- Get Held Pet
 local function getHeldPet()
     local char = LocalPlayer.Character
     if not char then return nil end
     for _, obj in ipairs(char:GetDescendants()) do
         if obj:IsA("Model") and not obj:FindFirstChildOfClass("Humanoid") then
-            local nameLower = obj.Name:lower()
+            local nameLower = string.lower(obj.Name)
             if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich") or nameLower:find("fox") then
                 return obj
             end
@@ -27,7 +27,7 @@ local function getHeldPet()
     return nil
 end
 
--- Scale pet naturally (visual only)
+-- Keep same working enlargement logic from your last working script
 local function scaleModelWithJoints(model, scaleFactor)
     for _, part in ipairs(model:GetDescendants()) do
         if part:IsA("BasePart") then
@@ -43,7 +43,7 @@ local function scaleModelWithJoints(model, scaleFactor)
     end
 end
 
--- Create GUI
+-- GUI Setup
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -55,126 +55,9 @@ MainFrame.BackgroundTransparency = 0.5
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
 
--- Rainbow title
-local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, -40, 0, 40)
-Title.Position = UDim2.new(0, 10, 0, 0)
-Title.BackgroundTransparency = 1
-Title.Text = "TOCHIPYRO"
-Title.Font = Enum.Font.GothamBold
-Title.TextScaled = true
-Title.Parent = MainFrame
-
-spawn(function()
-    local t = 0
-    while task.wait(0.05) do
-        Title.TextColor3 = rainbowColor(t)
-        t += 0.05
-    end
-end)
-
--- Minimize button
-local MinimizeButton = Instance.new("TextButton")
-MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
-MinimizeButton.Position = UDim2.new(1, -35, 0, 5)
-MinimizeButton.Text = "-"
-MinimizeButton.Font = Enum.Font.GothamBold
-MinimizeButton.TextScaled = true
-MinimizeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-MinimizeButton.Parent = MainFrame
-
--- Size enlarge button
-local SizeButton = Instance.new("TextButton")
-SizeButton.Size = UDim2.new(1, -20, 0, 40)
-SizeButton.Position = UDim2.new(0, 10, 0, 50)
-SizeButton.Text = "Size Enlarge"
-SizeButton.Font = Enum.Font.GothamBold
-SizeButton.TextScaled = true
-SizeButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-SizeButton.Parent = MainFrame
-
-SizeButton.MouseButton1Click:Connect(function()
-    local pet = getHeldPet()
-    if pet then
-        scaleModelWithJoints(pet, 1.75)
-    else
-        warn("No held pet found.")
-    end
-end)
-
--- More button
-local MoreButton = Instance.new("TextButton")
-MoreButton.Size = UDim2.new(1, -20, 0, 40)
-MoreButton.Position = UDim2.new(0, 10, 0, 100)
-MoreButton.Text = "More"
-MoreButton.Font = Enum.Font.GothamBold
-MoreButton.TextScaled = true
-MoreButton.BackgroundColor3 = Color3.fromRGB(255, 100, 255)
-MoreButton.Parent = MainFrame
-
--- More frame
-local MoreFrame = Instance.new("Frame")
-MoreFrame.Size = UDim2.new(0, 250, 0, 150)
-MoreFrame.Position = UDim2.new(0.35, 0, 0.35, 0)
-MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
-MoreFrame.BackgroundTransparency = 0.5
-MoreFrame.BorderSizePixel = 0
-MoreFrame.Visible = false
-MoreFrame.Parent = ScreenGui
-
-local Glow = Instance.new("UIStroke", MoreFrame)
-Glow.Color = Color3.fromRGB(255, 0, 255)
-Glow.Thickness = 3
-
-local BypassButton = Instance.new("TextButton")
-BypassButton.Size = UDim2.new(1, -20, 0, 40)
-BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.Text = "Bypass"
-BypassButton.Font = Enum.Font.GothamBold
-BypassButton.TextScaled = true
-BypassButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-BypassButton.Parent = MoreFrame
-
-local CloseButton = Instance.new("TextButton")
-CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.Text = "Close UI"
-CloseButton.Font = Enum.Font.GothamBold
-CloseButton.TextScaled = true
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-CloseButton.Parent = MoreFrame
-CloseButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = false
-end)
-
-MoreButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = not MoreFrame.Visible
-end)
-
--- Store all frames for minimize toggle
-local guiElements = {MainFrame, MoreFrame}
-
-local minimized = false
-MinimizeButton.MouseButton1Click:Connect(function()
-    minimized = true
-    for _, ui in ipairs(guiElements) do
-        ui.Visible = false
-    end
-end)
-
--- Toggle back with M key
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.M then
-        minimized = not minimized
-        for _, ui in ipairs(guiElements) do
-            ui.Visible = not minimized
-        end
-    end
-end)
-
--- Make GUI draggable from title
-local dragging, dragStart, startPos
-Title.InputBegan:Connect(function(input)
+-- Dragging logic
+local dragging, dragInput, dragStart, startPos
+MainFrame.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
@@ -187,10 +70,87 @@ Title.InputBegan:Connect(function(input)
     end
 end)
 
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
 UserInputService.InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+    if input == dragInput and dragging then
         local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X,
-                                       startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- Title
+local TitleBar = Instance.new("TextLabel")
+TitleBar.Size = UDim2.new(1, -60, 0, 40)
+TitleBar.Position = UDim2.new(0, 10, 0, 0)
+TitleBar.BackgroundTransparency = 1
+TitleBar.Text = "TOCHIPYRO"
+TitleBar.Font = Enum.Font.GothamBold
+TitleBar.TextScaled = true
+TitleBar.Parent = MainFrame
+
+-- Rainbow animation for title
+spawn(function()
+    local t = 0
+    while TitleBar do
+        TitleBar.TextColor3 = rainbowColor(t)
+        t = t + 0.05
+        task.wait(0.05)
+    end
+end)
+
+-- Close Button
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 40, 0, 40)
+CloseBtn.Position = UDim2.new(1, -40, 0, 0)
+CloseBtn.Text = "X"
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextScaled = true
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+CloseBtn.Parent = MainFrame
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Minimize Button
+local MinBtn = Instance.new("TextButton")
+MinBtn.Size = UDim2.new(0, 40, 0, 40)
+MinBtn.Position = UDim2.new(1, -80, 0, 0)
+MinBtn.Text = "-"
+MinBtn.Font = Enum.Font.GothamBold
+MinBtn.TextScaled = true
+MinBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+MinBtn.Parent = MainFrame
+local minimized = false
+MinBtn.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    for _, child in ipairs(MainFrame:GetChildren()) do
+        if child ~= TitleBar and child ~= MinBtn and child ~= CloseBtn then
+            child.Visible = not minimized
+        end
+    end
+    MainFrame.Size = minimized and UDim2.new(0, 300, 0, 40) or UDim2.new(0, 300, 0, 200)
+end)
+
+-- Size Enlarge Button
+local SizeButton = Instance.new("TextButton")
+SizeButton.Size = UDim2.new(1, -20, 0, 40)
+SizeButton.Position = UDim2.new(0, 10, 0, 50)
+SizeButton.Text = "Size Enlarge"
+SizeButton.Font = Enum.Font.GothamBold
+SizeButton.TextScaled = true
+SizeButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+SizeButton.Parent = MainFrame
+SizeButton.MouseButton1Click:Connect(function()
+    local pet = getHeldPet()
+    if pet then
+        scaleModelWithJoints(pet, 1.75)
+        print("Pet enlarged naturally:", pet.Name)
+    else
+        warn("No held pet found.")
     end
 end)
