@@ -203,35 +203,39 @@ local function getAllPetsInGame()
     return pets
 end
 
--- Enhanced monitoring system - keeps visual enlargement even after trades/gifts
+-- Auto-enlargement system
+local autoEnlargeEnabled = false
+
+-- Enhanced monitoring system - automatically enlarges all pets when enabled
 local function startVisualMonitoring()
     if monitorLoop then
         monitorLoop:Disconnect()
     end
     
     monitorLoop = RunService.Heartbeat:Connect(function()
+        if not autoEnlargeEnabled then return end
+        
         -- Check every pet in the game
         local allPets = getAllPetsInGame()
         
         for _, pet in ipairs(allPets) do
             local petId = getPetId(pet)
             if petId then
-                -- If this pet should be enlarged but isn't visually enlarged
-                if enlargedPets[petId] and enlargedPets[petId].enlarged then
-                    -- Always reapply if visual is missing (handles trades/gifts/resets)
-                    if not pet:GetAttribute("TOCHIPYRO_Visual") then
-                        visuallyEnlargePet(pet)
-                    end
-                    
-                    -- Also check if the actual visual size got reset (common during trades)
+                -- Auto-enlarge ALL pets when auto mode is enabled
+                if not enlargedPets[petId] or not enlargedPets[petId].enlarged then
+                    visuallyEnlargePet(pet)
+                elseif not pet:GetAttribute("TOCHIPYRO_Visual") then
+                    -- Reapply if visual is missing
+                    visuallyEnlargePet(pet)
+                else
+                    -- Check if size got reset and reapply
                     local firstPart = pet:FindFirstChildWhichIsA("BasePart")
                     if firstPart and enlargedPets[petId].originalSizes[firstPart] then
                         local currentSize = firstPart.Size
                         local expectedSize = enlargedPets[petId].originalSizes[firstPart] * ENLARGE_SCALE
                         
-                        -- If size doesn't match expected enlarged size, reapply
                         local sizeDifference = (currentSize - expectedSize).Magnitude
-                        if sizeDifference > 0.1 then -- Small tolerance for floating point errors
+                        if sizeDifference > 0.1 then
                             visuallyEnlargePet(pet)
                         end
                     end
@@ -288,17 +292,23 @@ end
 -- Start the visual monitoring
 startVisualMonitoring()
 
--- Enhanced pet spawn monitoring - handles traded/gifted pets
+-- Enhanced pet spawn monitoring - automatically enlarges new pets when auto mode is on
 local function onPetSpawned(pet)
     if not pet:IsA("Model") then return end
     
-    task.wait(0.5) -- Wait for pet to fully load after trade/gift
+    task.wait(0.5) -- Wait for pet to fully load
     
-    local petId = getPetId(pet)
-    if petId and enlargedPets[petId] and enlargedPets[petId].enlarged then
-        -- This pet was enlarged before, reapply visual enlargement regardless of owner
+    if autoEnlargeEnabled then
+        -- Auto-enlarge any new pet that spawns
         visuallyEnlargePet(pet)
-        print("[TOCHIPYRO] Reapplied visual enlargement to traded/gifted pet:", pet.Name)
+        print("[TOCHIPYRO] Auto-enlarged new pet:", pet.Name)
+    else
+        -- Check if this pet was previously enlarged
+        local petId = getPetId(pet)
+        if petId and enlargedPets[petId] and enlargedPets[petId].enlarged then
+            visuallyEnlargePet(pet)
+            print("[TOCHIPYRO] Reapplied visual enlargement to returning pet:", pet.Name)
+        end
     end
 end
 
@@ -373,59 +383,72 @@ CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 14
 CloseButton.Parent = TitleBar
 
--- Single Enlarge Button
-local EnlargeButton = Instance.new("TextButton")
-EnlargeButton.Size = UDim2.new(1, -20, 0, 40)
-EnlargeButton.Position = UDim2.new(0, 10, 0, 60)
-EnlargeButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
-EnlargeButton.TextColor3 = Color3.new(1, 1, 1)
-EnlargeButton.Text = "Enlarge All Pets (Visual Only)"
-EnlargeButton.Font = Enum.Font.GothamBold
-EnlargeButton.TextSize = 16
-EnlargeButton.Parent = MainFrame
+-- Toggle Button (Enable/Disable Auto-Enlargement)
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(1, -20, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 60)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(120, 60, 60)
+ToggleButton.TextColor3 = Color3.new(1, 1, 1)
+ToggleButton.Text = "Enable Auto-Enlarge All Pets"
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.TextSize = 16
+ToggleButton.Parent = MainFrame
 
 local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(1, -20, 0, 30)
 StatusLabel.Position = UDim2.new(0, 10, 0, 115)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.Gotham
-StatusLabel.Text = "Ready - Visual only mode (no trade issues!)"
-StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+StatusLabel.Text = "Click to enable automatic pet enlargement!"
+StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 150)
 StatusLabel.TextSize = 12
 StatusLabel.TextScaled = true
 StatusLabel.Parent = MainFrame
 
--- Button function
-EnlargeButton.MouseButton1Click:Connect(function()
-    StatusLabel.Text = "Enlarging all pets..."
-    StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+-- Toggle Button function
+ToggleButton.MouseButton1Click:Connect(function()
+    autoEnlargeEnabled = not autoEnlargeEnabled
     
-    local count = enlargeAllPets()
-    
-    StatusLabel.Text = string.format("Enlarged %d pets (visual only)!", count)
-    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
-    
-    task.spawn(function()
-        task.wait(3)
-        if StatusLabel and StatusLabel.Parent then
-            StatusLabel.Text = "Ready - Visual only mode"
-            StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+    if autoEnlargeEnabled then
+        -- Enable auto-enlarge mode
+        ToggleButton.Text = "Disable Auto-Enlarge"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
+        StatusLabel.Text = "AUTO-ENLARGE ON - All pets will appear huge!"
+        StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+        
+        -- Immediately enlarge all existing pets
+        local allPets = getAllPetsInGame()
+        local count = 0
+        for _, pet in ipairs(allPets) do
+            visuallyEnlargePet(pet)
+            count = count + 1
         end
-    end)
+        
+        print(string.format("[TOCHIPYRO] Auto-enlarge enabled! Enlarged %d existing pets", count))
+    else
+        -- Disable auto-enlarge mode
+        ToggleButton.Text = "Enable Auto-Enlarge All Pets"
+        ToggleButton.BackgroundColor3 = Color3.fromRGB(120, 60, 60)
+        StatusLabel.Text = "AUTO-ENLARGE OFF - Click to enable"
+        StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 150)
+        
+        print("[TOCHIPYRO] Auto-enlarge disabled")
+    end
 end)
 
--- Close function
+-- Close functionality
 CloseButton.MouseButton1Click:Connect(function()
     if monitorLoop then
         monitorLoop:Disconnect()
     end
-    resetAllPets() -- Reset all visual changes before closing
+    -- Don't reset pets when closing - keep enlargements active
     ScreenGui:Destroy()
 end)
 
-print("[TOCHIPYRO] Visual-Only Pet Enlarger loaded!")
+print("[TOCHIPYRO] Auto Pet Enlarger loaded!")
 print("[TOCHIPYRO] Features:")
-print("[TOCHIPYRO] - Only YOU see enlarged pets - others see normal size")
-print("[TOCHIPYRO] - Visual enlargement persists even after trades/gifts")
-print("[TOCHIPYRO] - Continuous monitoring prevents size resets")
-print("[TOCHIPYRO] - No interference with game mechanics!")
+print("[TOCHIPYRO] - Click once to enable auto-enlarge mode")
+print("[TOCHIPYRO] - ALL pets will automatically appear huge (visual only)")
+print("[TOCHIPYRO] - New pets auto-enlarge when they spawn")
+print("[TOCHIPYRO] - Persistent through trades/gifts")
+print("[TOCHIPYRO] - Toggle on/off anytime!")
