@@ -1,144 +1,297 @@
--- Local-only Enlarged Pets in Grow a Garden with UI (Draggable + Full Minimize)
+-- TOCHIPYRO — Local-only Pet Enlarger (draggable UI, full minimize, robust reapply)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
--- Store pet names & scale factors
-local enlargedPetTemplates = {}
+if not LocalPlayer then return end
 
--- Rainbow color function
-local function rainbowColor(t)
-    local r = math.sin(t * 2) * 127 + 128
-    local g = math.sin(t * 2 + 2) * 127 + 128
-    local b = math.sin(t * 2 + 4) * 127 + 128
-    return Color3.fromRGB(r, g, b)
+-- config
+local SCALE_FACTOR = 1.75
+
+-- tables
+local enlargedTemplates = {}   -- keyed by template name -> scaleFactor
+local scaledInstances = {}     -- model instance -> true (to avoid double-scaling)
+
+-- helpers
+local function isModelLikelyPet(model)
+    if not model or not model:IsA("Model") then return false end
+    if model:FindFirstChildOfClass("Humanoid") then return false end
+    local partCount = 0
+    for _, d in ipairs(model:GetDescendants()) do
+        if d:IsA("BasePart") then
+            partCount = partCount + 1
+            if partCount >= 2 then break end
+        end
+    end
+    return partCount >= 2
 end
 
--- Scale pet model (preserve proportions & joints)
-local function scalePetModel(petModel, scaleFactor)
-	if not petModel or not petModel:IsA("Model") then return end
-	for _, obj in ipairs(petModel:GetDescendants()) do
-		if obj:IsA("BasePart") then
-			obj.Size = obj.Size * scaleFactor
-		elseif obj:IsA("SpecialMesh") then
-			obj.Scale = obj.Scale * scaleFactor
-		elseif obj:IsA("Motor6D") then
-			local c0Pos, c0Rot = obj.C0.Position, obj.C0 - obj.C0.Position
-			local c1Pos, c1Rot = obj.C1.Position, obj.C1 - obj.C1.Position
-			obj.C0 = CFrame.new(c0Pos * scaleFactor) * c0Rot
-			obj.C1 = CFrame.new(c1Pos * scaleFactor) * c1Rot
-		end
-	end
+local function safeCFrameScale(cf, scale)
+    -- preserve rotation, scale only position
+    local pos = cf.Position * scale
+    return CFrame.new(pos) * (cf - cf.Position)
 end
 
--- Detect currently held pet
+local function scaleModelWithJoints(model, factor)
+    if not model or not model:IsA("Model") then return end
+    if scaledInstances[model] then return end
+
+    -- try to choose a deterministic order to reduce weirdness
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("SpecialMesh") then
+            pcall(function() obj.Scale = obj.Scale * factor end)
+        end
+    end
+
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            pcall(function() obj.Size = obj.Size * factor end)
+        end
+    end
+
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("Motor6D") then
+            local ok, c0, c1 = pcall(function() return obj.C0, obj.C1 end)
+            if ok and c0 and c1 then
+                pcall(function() obj.C0 = safeCFrameScale(c0, factor) end)
+                pcall(function() obj.C1 = safeCFrameScale(c1, factor) end)
+            end
+        end
+    end
+
+    -- mark to avoid double-scaling this same instance
+    scaledInstances[model] = true
+    pcall(function() model:SetAttribute("TOCHIPYRO_Enlarged", true) end)
+end
+
+-- get held pet (tries reasonably hard)
 local function getHeldPet()
-	local char = LocalPlayer.Character
-	if not char then return nil end
-	for _, obj in ipairs(char:GetChildren()) do
-		if obj:IsA("Model") and not obj:FindFirstChildOfClass("Humanoid") then
-			if obj:FindFirstChildWhichIsA("BasePart") then
-				return obj
-			end
-		end
-	end
-	return nil
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    -- prefer models directly under char first
+    for _, obj in ipairs(char:GetChildren()) do
+        if isModelLikelyPet(obj) then
+            return obj
+        end
+    end
+    -- fallback: deeper search
+    for _, obj in ipairs(char:GetDescendants()) do
+        if isModelLikelyPet(obj) then
+            return obj
+        end
+    end
+    -- last resort: nearest model within short radius
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local best, bestDist = nil, math.huge
+        for _, m in ipairs(Workspace:GetDescendants()) do
+            if isModelLikelyPet(m) then
+                local base = m.PrimaryPart or m:FindFirstChildWhichIsA("BasePart")
+                if base then
+                    local d = (base.Position - hrp.Position).Magnitude
+                    if d < bestDist and d <= 15 then
+                        bestDist, best = d, m
+                    end
+                end
+            end
+        end
+        return best
+    end
+    return nil
 end
 
--- GUI creation
-local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
-gui.Name = "TOCHIPYRO_GUI"
+-- apply scaling for any model matching stored template names
+local function tryApplyTemplateScale(model)
+    if not model or not model:IsA("Model") then return end
+    if scaledInstances[model] then return end
+    local tname = model.Name
+    local factor = enlargedTemplates[tname]
+    if factor then
+        -- small wait to allow parts to appear
+        task.spawn(function()
+            task.wait(0.06)
+            scaleModelWithJoints(model, factor)
+            -- also attempt to mark children so reparenting doesn't re-trigger wrong
+        end)
+    end
+end
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 320, 0, 180)
-frame.Position = UDim2.new(0.35, 0, 0.35, 0)
-frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-frame.BackgroundTransparency = 0.5
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true -- make it movable
-
--- Rainbow title
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 40)
-title.BackgroundTransparency = 1
-title.Text = "TOCHIPYRO"
-title.Font = Enum.Font.SourceSansBold
-title.TextScaled = true
-
--- Rainbow animation
-spawn(function()
-	local t = 0
-	while gui.Parent do
-		title.TextColor3 = rainbowColor(t)
-		t = t + 0.05
-		task.wait(0.05)
-	end
+-- event: whenever a new descendant appears in workspace, check for template match
+Workspace.DescendantAdded:Connect(function(desc)
+    -- If it's a Model itself or contained within a Model, find top model
+    local model = desc
+    while model and not model:IsA("Model") do
+        model = model.Parent
+    end
+    if model and isModelLikelyPet(model) then
+        tryApplyTemplateScale(model)
+    end
 end)
 
+-- GUI: create (destroy existing if present)
+local existing = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("TOCHIPYRO_GUI")
+if existing then existing:Destroy() end
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "TOCHIPYRO_GUI"
+gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 340, 0, 190)
+frame.Position = UDim2.new(0.35, 0, 0.35, 0)
+frame.BackgroundColor3 = Color3.fromRGB(10,10,10)
+frame.BackgroundTransparency = 0.5
+frame.BorderSizePixel = 0
+frame.ZIndex = 5
+
+-- TitleBar (use TextButton to capture input for dragging)
+local titleBar = Instance.new("TextButton", frame)
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 40)
+titleBar.Position = UDim2.new(0, 0, 0, 0)
+titleBar.BackgroundTransparency = 1
+titleBar.AutoButtonColor = false
+
+local titleLabel = Instance.new("TextLabel", titleBar)
+titleLabel.Size = UDim2.new(1, -80, 1, 0)
+titleLabel.Position = UDim2.new(0, 10, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "TOCHIPYRO"
+titleLabel.Font = Enum.Font.SourceSansBold
+titleLabel.TextScaled = true
+titleLabel.TextColor3 = Color3.new(1,1,1)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+-- Rainbow animation
+task.spawn(function()
+    local t = 0
+    while gui.Parent do
+        local c = Color3.fromHSV((tick()*0.12) % 1, 1, 1)
+        titleLabel.TextColor3 = c
+        t += 1
+        task.wait(0.06)
+    end
+end)
+
+-- Minimize & Close buttons (stay visible when minimized)
+local btnMin = Instance.new("TextButton", titleBar)
+btnMin.Size = UDim2.new(0, 32, 0, 24)
+btnMin.Position = UDim2.new(1, -74, 0, 8)
+btnMin.Text = "—"
+btnMin.Font = Enum.Font.SourceSansBold
+btnMin.TextScaled = true
+btnMin.BackgroundColor3 = Color3.fromRGB(255,170,0)
+
+local btnClose = Instance.new("TextButton", titleBar)
+btnClose.Size = UDim2.new(0, 32, 0, 24)
+btnClose.Position = UDim2.new(1, -36, 0, 8)
+btnClose.Text = "✕"
+btnClose.Font = Enum.Font.SourceSansBold
+btnClose.TextScaled = true
+btnClose.BackgroundColor3 = Color3.fromRGB(255,60,60)
+
+-- main content container (so we can hide/show easily)
+local content = Instance.new("Frame", frame)
+content.Name = "Content"
+content.Size = UDim2.new(1, -20, 1, -60)
+content.Position = UDim2.new(0, 10, 0, 50)
+content.BackgroundTransparency = 1
+
 -- Enlarge button
-local enlargeBtn = Instance.new("TextButton", frame)
-enlargeBtn.Size = UDim2.new(1, -20, 0, 40)
-enlargeBtn.Position = UDim2.new(0, 10, 0, 50)
+local enlargeBtn = Instance.new("TextButton", content)
+enlargeBtn.Size = UDim2.new(1, 0, 0, 40)
+enlargeBtn.Position = UDim2.new(0, 0, 0, 0)
 enlargeBtn.Text = "Enlarge Held Pet (Local Only)"
 enlargeBtn.Font = Enum.Font.SourceSansBold
 enlargeBtn.TextScaled = true
-enlargeBtn.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+enlargeBtn.BackgroundColor3 = Color3.fromRGB(0,170,255)
 
 enlargeBtn.MouseButton1Click:Connect(function()
-	local pet = getHeldPet()
-	if pet then
-		local name = pet.Name
-		enlargedPetTemplates[name] = 1.75
-		scalePetModel(pet, 1.75)
-		print("Enlarged pet locally:", name)
-	else
-		warn("No held pet found.")
-	end
+    local pet = getHeldPet()
+    if pet then
+        local tname = pet.Name or ("Pet_" .. tostring(math.random(10000)))
+        enlargedTemplates[tname] = SCALE_FACTOR
+        scaleModelWithJoints(pet, SCALE_FACTOR)
+        print("[TOCHIPYRO] Enlarged local held pet:", tname)
+    else
+        warn("[TOCHIPYRO] No held pet detected.")
+    end
 end)
 
--- Minimize button
-local minimizeBtn = Instance.new("TextButton", frame)
-minimizeBtn.Size = UDim2.new(0, 30, 0, 30)
-minimizeBtn.Position = UDim2.new(1, -70, 0, 5)
-minimizeBtn.Text = "-"
-minimizeBtn.Font = Enum.Font.SourceSansBold
-minimizeBtn.TextScaled = true
-minimizeBtn.BackgroundColor3 = Color3.fromRGB(255, 170, 0)
+-- small spacer and info label
+local infoLabel = Instance.new("TextLabel", content)
+infoLabel.Size = UDim2.new(1, 0, 0, 24)
+infoLabel.Position = UDim2.new(0, 0, 0, 48)
+infoLabel.BackgroundTransparency = 1
+infoLabel.Text = "Enlarged pets are local visuals only."
+infoLabel.Font = Enum.Font.SourceSans
+infoLabel.TextSize = 14
+infoLabel.TextColor3 = Color3.fromRGB(200,200,200)
 
--- Close button
-local closeBtn = Instance.new("TextButton", frame)
-closeBtn.Size = UDim2.new(0, 30, 0, 30)
-closeBtn.Position = UDim2.new(1, -35, 0, 5)
-closeBtn.Text = "X"
-closeBtn.Font = Enum.Font.SourceSansBold
-closeBtn.TextScaled = true
-closeBtn.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-
--- Minimize toggle
+-- Minimize logic
 local minimized = false
-minimizeBtn.MouseButton1Click:Connect(function()
-	minimized = not minimized
-	if minimized then
-		frame.Size = UDim2.new(0, 320, 0, 40) -- shrink to title bar
-	else
-		frame.Size = UDim2.new(0, 320, 0, 180) -- restore size
-	end
-	for _, child in ipairs(frame:GetChildren()) do
-		if child ~= title and child ~= minimizeBtn and child ~= closeBtn then
-			child.Visible = not minimized
-		end
-	end
+local originalSize = frame.Size
+btnMin.MouseButton1Click:Connect(function()
+    minimized = not minimized
+    if minimized then
+        -- hide content, resize to title only
+        content.Visible = false
+        frame.Size = UDim2.new(frame.Size.X.Scale, frame.Size.X.Offset, 0, 40)
+    else
+        content.Visible = true
+        frame.Size = originalSize
+    end
 end)
 
--- Close button hides GUI
-closeBtn.MouseButton1Click:Connect(function()
-	gui:Destroy()
+-- Close
+btnClose.MouseButton1Click:Connect(function()
+    gui:Destroy()
 end)
 
--- Auto enlarge matching pets
-workspace.DescendantAdded:Connect(function(desc)
-	if desc:IsA("Model") and enlargedPetTemplates[desc.Name] then
-		task.wait(0.05)
-		scalePetModel(desc, enlargedPetTemplates[desc.Name])
-	end
+-- Draggable titleBar (manual)
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
 end)
+
+titleBar.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and dragStart and startPos then
+            local delta = input.Position - dragStart
+            local newX = startPos.X.Scale
+            local newY = startPos.Y.Scale
+            local newXOff = startPos.X.Offset + delta.X
+            local newYOff = startPos.Y.Offset + delta.Y
+            frame.Position = UDim2.new(newX, newXOff, newY, newYOff)
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Also try to re-apply scale to any currently existing matching models on load
+for _, inst in ipairs(Workspace:GetDescendants()) do
+    if inst:IsA("Model") and enlargedTemplates[inst.Name] then
+        tryApplyTemplateScale(inst)
+    end
+end
+
+print("[TOCHIPYRO] UI loaded (draggable + full minimize).")
