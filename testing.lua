@@ -338,30 +338,20 @@ CloseButton.Font = Enum.Font.GothamBold
 CloseButton.TextSize = 14
 CloseButton.Parent = TitleBar
 
--- Buttons
-local EnlargeCurrentButton = Instance.new("TextButton")
-EnlargeCurrentButton.Size = UDim2.new(1, -20, 0, 30)
-EnlargeCurrentButton.Position = UDim2.new(0, 10, 0, 45)
-EnlargeCurrentButton.BackgroundColor3 = Color3.fromRGB(60, 120, 60)
-EnlargeCurrentButton.TextColor3 = Color3.new(1, 1, 1)
-EnlargeCurrentButton.Text = "Enlarge Current Pet"
-EnlargeCurrentButton.Font = Enum.Font.GothamBold
-EnlargeCurrentButton.TextSize = 14
-EnlargeCurrentButton.Parent = MainFrame
-
-local EnlargeAllButton = Instance.new("TextButton")
-EnlargeAllButton.Size = UDim2.new(1, -20, 0, 30)
-EnlargeAllButton.Position = UDim2.new(0, 10, 0, 80)
-EnlargeAllButton.BackgroundColor3 = Color3.fromRGB(80, 100, 200)
-EnlargeAllButton.TextColor3 = Color3.new(1, 1, 1)
-EnlargeAllButton.Text = "Enlarge ALL Pets (Visual Only)"
-EnlargeAllButton.Font = Enum.Font.GothamBold
-EnlargeAllButton.TextSize = 14
-EnlargeAllButton.Parent = MainFrame
+-- Single Enlarge Button
+local EnlargeButton = Instance.new("TextButton")
+EnlargeButton.Size = UDim2.new(1, -20, 0, 40)
+EnlargeButton.Position = UDim2.new(0, 10, 0, 60)
+EnlargeButton.BackgroundColor3 = Color3.fromRGB(80, 120, 200)
+EnlargeButton.TextColor3 = Color3.new(1, 1, 1)
+EnlargeButton.Text = "Enlarge All Pets (Visual Only)"
+EnlargeButton.Font = Enum.Font.GothamBold
+EnlargeButton.TextSize = 16
+EnlargeButton.Parent = MainFrame
 
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -20, 0, 25)
-StatusLabel.Position = UDim2.new(0, 10, 0, 125)
+StatusLabel.Size = UDim2.new(1, -20, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 115)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Font = Enum.Font.Gotham
 StatusLabel.Text = "Ready - Visual only mode (no trade issues!)"
@@ -370,22 +360,8 @@ StatusLabel.TextSize = 12
 StatusLabel.TextScaled = true
 StatusLabel.Parent = MainFrame
 
--- Button functions
-EnlargeCurrentButton.MouseButton1Click:Connect(function()
-    local success, message = enlargeCurrentPet()
-    StatusLabel.Text = message
-    StatusLabel.TextColor3 = success and Color3.fromRGB(100, 255, 100) or Color3.fromRGB(255, 100, 100)
-    
-    task.spawn(function()
-        task.wait(3)
-        if StatusLabel and StatusLabel.Parent then
-            StatusLabel.Text = "Ready - Visual only mode"
-            StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
-        end
-    end)
-end)
-
-EnlargeAllButton.MouseButton1Click:Connect(function()
+-- Button function
+EnlargeButton.MouseButton1Click:Connect(function()
     StatusLabel.Text = "Enlarging all pets..."
     StatusLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
     
