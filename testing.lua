@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 local workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
 
 local ENLARGE_SCALE = 1.75
 local WEIGHT_MULTIPLIER = 2.5
@@ -204,7 +205,7 @@ end
 LocalPlayer.CharacterAdded:Connect(setupCharacterMonitoring)
 setupCharacterMonitoring()
 
--- Create your simple UI
+-- Create movable GUI with minimize function
 
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "TOCHIPYRO_Script"
@@ -212,40 +213,159 @@ ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 280, 0, 140)
-MainFrame.Position = UDim2.new(0.5, -140, 0.5, -70)
+MainFrame.Position = UDim2.new(0, 50, 0, 50) -- Start at top-left instead of center
 MainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 MainFrame.BackgroundTransparency = 0.5
 MainFrame.BorderSizePixel = 0
 MainFrame.Parent = ScreenGui
+MainFrame.Active = true
+MainFrame.Draggable = true -- Make the frame draggable
+
+-- Title Bar for better dragging experience
+local TitleBar = Instance.new("Frame")
+TitleBar.Size = UDim2.new(1, 0, 0, 40)
+TitleBar.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+TitleBar.BackgroundTransparency = 0.3
+TitleBar.BorderSizePixel = 0
+TitleBar.Parent = MainFrame
+TitleBar.Active = true
 
 local Title = Instance.new("TextLabel")
-Title.Size = UDim2.new(1, 0, 0, 40)
+Title.Size = UDim2.new(1, -80, 1, 0) -- Leave space for minimize button
 Title.BackgroundTransparency = 1
 Title.Font = Enum.Font.GothamBold
 Title.Text = "TOCHIPYRO Script"
-Title.TextSize = 26
-Title.Parent = MainFrame
+Title.TextSize = 20
+Title.Parent = TitleBar
 
 -- Rainbow text effect
 spawn(function()
     while Title and Title.Parent do
         for h = 0, 1, 0.01 do
-            Title.TextColor3 = Color3.fromHSV(h, 1, 1)
-            task.wait(0.02)
+            if Title and Title.Parent then
+                Title.TextColor3 = Color3.fromHSV(h, 1, 1)
+                task.wait(0.02)
+            else
+                break
+            end
         end
     end
 end)
 
+-- Minimize Button
+local MinimizeButton = Instance.new("TextButton")
+MinimizeButton.Size = UDim2.new(0, 30, 0, 30)
+MinimizeButton.Position = UDim2.new(1, -35, 0, 5)
+MinimizeButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+MinimizeButton.TextColor3 = Color3.new(1, 1, 1)
+MinimizeButton.Text = "_"
+MinimizeButton.Font = Enum.Font.GothamBold
+MinimizeButton.TextSize = 20
+MinimizeButton.Parent = TitleBar
+
+-- Close Button
+local CloseButton = Instance.new("TextButton")
+CloseButton.Size = UDim2.new(0, 30, 0, 30)
+CloseButton.Position = UDim2.new(1, -70, 0, 5)
+CloseButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+CloseButton.TextColor3 = Color3.new(1, 1, 1)
+CloseButton.Text = "X"
+CloseButton.Font = Enum.Font.GothamBold
+CloseButton.TextSize = 16
+CloseButton.Parent = TitleBar
+
+-- Content Frame (what gets hidden/shown)
+local ContentFrame = Instance.new("Frame")
+ContentFrame.Size = UDim2.new(1, 0, 1, -40)
+ContentFrame.Position = UDim2.new(0, 0, 0, 40)
+ContentFrame.BackgroundTransparency = 1
+ContentFrame.Parent = MainFrame
+
 local SizeButton = Instance.new("TextButton")
 SizeButton.Size = UDim2.new(1, -20, 0, 40)
-SizeButton.Position = UDim2.new(0, 10, 0, 50)
+SizeButton.Position = UDim2.new(0, 10, 0, 10)
 SizeButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 SizeButton.TextColor3 = Color3.new(1, 1, 1)
 SizeButton.Text = "Size Enlarge + Weight"
 SizeButton.Font = Enum.Font.GothamBold
 SizeButton.TextScaled = true
-SizeButton.Parent = MainFrame
+SizeButton.Parent = ContentFrame
 
-SizeButton.MouseButton1Click:Connect(enlargeCurrentPet)
+-- Status Label
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Size = UDim2.new(1, -20, 0, 30)
+StatusLabel.Position = UDim2.new(0, 10, 0, 60)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.Font = Enum.Font.Gotham
+StatusLabel.Text = "Ready to enlarge pets!"
+StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+StatusLabel.TextSize = 14
+StatusLabel.TextScaled = true
+StatusLabel.Parent = ContentFrame
 
-print("[TOCHIPYRO] Pet enlarger with weight update loaded!")
+-- Minimize/Restore functionality
+local isMinimized = false
+local originalSize = MainFrame.Size
+
+MinimizeButton.MouseButton1Click:Connect(function()
+    if isMinimized then
+        -- Restore
+        MainFrame.Size = originalSize
+        ContentFrame.Visible = true
+        MinimizeButton.Text = "_"
+        isMinimized = false
+    else
+        -- Minimize
+        MainFrame.Size = UDim2.new(0, 280, 0, 40)
+        ContentFrame.Visible = false
+        MinimizeButton.Text = "+"
+        isMinimized = true
+    end
+end)
+
+-- Close functionality
+CloseButton.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
+
+-- Button functionality
+SizeButton.MouseButton1Click:Connect(function()
+    enlargeCurrentPet()
+    StatusLabel.Text = "Pet enlarged!"
+    StatusLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+    
+    -- Reset status after 2 seconds
+    task.wait(2)
+    if StatusLabel and StatusLabel.Parent then
+        StatusLabel.Text = "Ready to enlarge pets!"
+        StatusLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
+    end
+end)
+
+-- Make the GUI draggable by the title bar
+local dragging = false
+local dragStart = nil
+local startPos = nil
+
+TitleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+TitleBar.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+print("[TOCHIPYRO] Pet enlarger with movable GUI loaded!")
