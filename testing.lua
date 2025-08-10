@@ -1,46 +1,71 @@
--- TOCHIPYRO Script for Grow a Garden
+-- Grow a Garden - Persistent Pet Enlargement (Local Visual Only)
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
 
--- Function to create rainbow color
-local function rainbowColor(t)
-    local r = math.sin(t*2) * 127 + 128
-    local g = math.sin(t*2 + 2) * 127 + 128
-    local b = math.sin(t*2 + 4) * 127 + 128
-    return Color3.fromRGB(r, g, b)
+-- Table to store pets we have enlarged (by unique name/id)
+local enlargedPets = {}
+
+-- Function to detect if a model is a pet
+local function isPetModel(model)
+	if not model:IsA("Model") then return false end
+	if model:FindFirstChildOfClass("Humanoid") then return false end
+	if model:FindFirstChildWhichIsA("BasePart") then
+		-- Optional: filter by tags/names if game uses them
+		local nameLower = string.lower(model.Name)
+		if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich") 
+		or nameLower:find("fox") or nameLower:find("bunny") or nameLower:find("duck") then
+			return true
+		end
+	end
+	return false
 end
 
--- Find held pet
-local function getHeldPet()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-
-    for _, obj in ipairs(char:GetDescendants()) do
-        if obj:IsA("Model") and not obj:FindFirstChildOfClass("Humanoid") then
-            local nameLower = string.lower(obj.Name)
-            if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich") or nameLower:find("fox") then
-                return obj
-            end
-        end
-    end
-    return nil
-end
-
--- Scale pet naturally (preserve joints)
+-- Scale pet naturally
 local function scaleModelWithJoints(model, scaleFactor)
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.Size = part.Size * scaleFactor
-        elseif part:IsA("SpecialMesh") then
-            part.Scale = part.Scale * scaleFactor
-        elseif part:IsA("Motor6D") then
-            local c0Pos, c0Rot = part.C0.Position, part.C0 - part.C0.Position
-            local c1Pos, c1Rot = part.C1.Position, part.C1 - part.C1.Position
-            part.C0 = CFrame.new(c0Pos * scaleFactor) * c0Rot
-            part.C1 = CFrame.new(c1Pos * scaleFactor) * c1Rot
-        end
-    end
+	for _, part in ipairs(model:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Size = part.Size * scaleFactor
+		elseif part:IsA("SpecialMesh") then
+			part.Scale = part.Scale * scaleFactor
+		elseif part:IsA("Motor6D") then
+			local c0Pos, c0Rot = part.C0.Position, part.C0 - part.C0.Position
+			local c1Pos, c1Rot = part.C1.Position, part.C1 - part.C1.Position
+			part.C0 = CFrame.new(c0Pos * scaleFactor) * c0Rot
+			part.C1 = CFrame.new(c1Pos * scaleFactor) * c1Rot
+		end
+	end
 end
+
+-- Function to enlarge a pet and remember it
+local function enlargePet(pet, factor)
+	if not pet or not pet:IsDescendantOf(workspace) then return end
+	scaleModelWithJoints(pet, factor)
+	enlargedPets[pet.Name] = factor -- store factor by name (can be changed to unique ID if available)
+	print("Enlarged pet:", pet.Name, "Factor:", factor)
+end
+
+-- Detect held pet
+local function getHeldPet()
+	local char = LocalPlayer.Character
+	if not char then return nil end
+	for _, obj in ipairs(char:GetChildren()) do
+		if isPetModel(obj) then
+			return obj
+		end
+	end
+	return nil
+end
+
+-- Reapply enlargement when pets spawn
+workspace.DescendantAdded:Connect(function(desc)
+	if isPetModel(desc) and enlargedPets[desc.Name] then
+		task.wait(0.2) -- small delay to let it load
+		scaleModelWithJoints(desc, enlargedPets[desc.Name])
+		print("Re-applied enlargement to:", desc.Name)
+	end
+end)
 
 -- GUI creation
 local ScreenGui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
@@ -51,87 +76,28 @@ MainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 MainFrame.BackgroundTransparency = 0.5
 MainFrame.BorderSizePixel = 0
 
--- Rainbow title
+-- Title
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1, 0, 0, 40)
 Title.BackgroundTransparency = 1
-Title.Text = "TOCHIPYRO Script"
+Title.Text = "Pet Size Control"
 Title.Font = Enum.Font.SourceSansBold
 Title.TextScaled = true
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
 
--- Animate rainbow
-spawn(function()
-    local t = 0
-    while true do
-        Title.TextColor3 = rainbowColor(t)
-        t = t + 0.05
-        task.wait(0.05)
-    end
-end)
-
--- Size Enlarge Button
+-- Enlarge button
 local SizeButton = Instance.new("TextButton", MainFrame)
 SizeButton.Size = UDim2.new(1, -20, 0, 40)
 SizeButton.Position = UDim2.new(0, 10, 0, 50)
-SizeButton.Text = "Size Enlarge"
+SizeButton.Text = "Enlarge Held Pet"
 SizeButton.Font = Enum.Font.SourceSansBold
 SizeButton.TextScaled = true
 SizeButton.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 SizeButton.MouseButton1Click:Connect(function()
-    local pet = getHeldPet()
-    if pet then
-        scaleModelWithJoints(pet, 1.75) -- 75% bigger
-        print("Pet enlarged naturally:", pet.Name)
-    else
-        warn("No held pet found.")
-    end
-end)
-
--- More Button
-local MoreButton = Instance.new("TextButton", MainFrame)
-MoreButton.Size = UDim2.new(1, -20, 0, 40)
-MoreButton.Position = UDim2.new(0, 10, 0, 100)
-MoreButton.Text = "More"
-MoreButton.Font = Enum.Font.SourceSansBold
-MoreButton.TextScaled = true
-MoreButton.BackgroundColor3 = Color3.fromRGB(255, 100, 255)
-
--- Secondary UI
-local MoreFrame = Instance.new("Frame", ScreenGui)
-MoreFrame.Size = UDim2.new(0, 250, 0, 150)
-MoreFrame.Position = UDim2.new(0.35, 0, 0.35, 0)
-MoreFrame.BackgroundColor3 = Color3.fromRGB(128, 0, 128)
-MoreFrame.BackgroundTransparency = 0.5
-MoreFrame.Visible = false
-MoreFrame.BorderSizePixel = 0
-
--- Glow effect
-local Glow = Instance.new("UIStroke", MoreFrame)
-Glow.Color = Color3.fromRGB(255, 0, 255)
-Glow.Thickness = 3
-
--- Bypass button
-local BypassButton = Instance.new("TextButton", MoreFrame)
-BypassButton.Size = UDim2.new(1, -20, 0, 40)
-BypassButton.Position = UDim2.new(0, 10, 0, 10)
-BypassButton.Text = "Bypass"
-BypassButton.Font = Enum.Font.SourceSansBold
-BypassButton.TextScaled = true
-BypassButton.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-
--- Close UI button
-local CloseButton = Instance.new("TextButton", MoreFrame)
-CloseButton.Size = UDim2.new(1, -20, 0, 40)
-CloseButton.Position = UDim2.new(0, 10, 0, 60)
-CloseButton.Text = "Close UI"
-CloseButton.Font = Enum.Font.SourceSansBold
-CloseButton.TextScaled = true
-CloseButton.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-CloseButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = false
-end)
-
--- More button opens secondary UI
-MoreButton.MouseButton1Click:Connect(function()
-    MoreFrame.Visible = true
+	local pet = getHeldPet()
+	if pet then
+		enlargePet(pet, 1.75) -- 75% bigger
+	else
+		warn("No held pet found.")
+	end
 end)
