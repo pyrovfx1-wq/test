@@ -34,17 +34,25 @@ local function isPetVisuallyReset(petModel)
     local id = getPetUniqueId(petModel)
     if not id or not originalPartSizes[id] then return false end
     
+    local resetCount = 0
+    local totalParts = 0
+    
     for part, originalSize in pairs(originalPartSizes[id]) do
         if part and part.Parent then
+            totalParts = totalParts + 1
             local expectedSize = originalSize * ENLARGE_SCALE
             local currentSize = part.Size
-            -- Check if size is significantly different from expected enlarged size
-            if math.abs(currentSize.X - expectedSize.X) > 0.1 then
-                return true
+            -- Check if size is significantly different from expected enlarged size (tolerance of 0.5)
+            if math.abs(currentSize.X - expectedSize.X) > 0.5 or 
+               math.abs(currentSize.Y - expectedSize.Y) > 0.5 or 
+               math.abs(currentSize.Z - expectedSize.Z) > 0.5 then
+                resetCount = resetCount + 1
             end
         end
     end
-    return false
+    
+    -- If more than 50% of parts are reset, consider the pet reset
+    return totalParts > 0 and (resetCount / totalParts) > 0.5
 end
 
 -- Deep find Weight NumberValue inside pet model
@@ -65,6 +73,11 @@ end
 
 -- Scale pet parts and joints properly
 local function scaleModelWithJoints(model, scaleFactor)
+    if not model or not model.Parent then return end
+    
+    -- Clear any existing scale attribute to avoid conflicts
+    model:SetAttribute("TOCHIPYRO_Enlarged", nil)
+    
     for _, obj in ipairs(model:GetDescendants()) do
         if obj:IsA("BasePart") then
             obj.Size = obj.Size * scaleFactor
@@ -73,11 +86,17 @@ local function scaleModelWithJoints(model, scaleFactor)
         elseif obj:IsA("Motor6D") then
             obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
             obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
+        elseif obj:IsA("Weld") then
+            obj.C0 = CFrame.new(obj.C0.Position * scaleFactor) * (obj.C0 - obj.C0.Position)
+            obj.C1 = CFrame.new(obj.C1.Position * scaleFactor) * (obj.C1 - obj.C1.Position)
         end
     end
 
+    -- Set attributes after scaling
     model:SetAttribute("TOCHIPYRO_Enlarged", true)
     model:SetAttribute("TOCHIPYRO_Scale", scaleFactor)
+    
+    print("[TOCHIPYRO] Successfully scaled model:", model.Name)
 end
 
 -- Increase pet weight in the model and GUI
@@ -145,18 +164,21 @@ local function startPetMonitor(petModel)
         end
 
         if enlargedPetIds[id] then
-            -- Check if pet lost its enlarged attribute OR if visually reset
-            local needsReapply = not petModel:GetAttribute("TOCHIPYRO_Enlarged") or isPetVisuallyReset(petModel)
-            
-            if needsReapply then
-                -- Store original sizes before reapplying
-                if not originalPartSizes[id] then
-                    storeOriginalSizes(petModel)
+            -- Only check for reset every 30 frames to avoid performance issues
+            if tick() % 1 < 0.03 then -- Check roughly once per second
+                local needsReapply = not petModel:GetAttribute("TOCHIPYRO_Enlarged") or isPetVisuallyReset(petModel)
+                
+                if needsReapply then
+                    print("[TOCHIPYRO] Detected pet reset, reapplying enlargement...")
+                    -- Store original sizes before reapplying if not already stored
+                    if not originalPartSizes[id] then
+                        storeOriginalSizes(petModel)
+                    end
+                    -- reapply scale and weight if lost
+                    scaleModelWithJoints(petModel, ENLARGE_SCALE)
+                    increaseWeight(petModel)
+                    print("[TOCHIPYRO] Reapplied enlargement to pet:", petModel.Name)
                 end
-                -- reapply scale and weight if lost
-                scaleModelWithJoints(petModel, ENLARGE_SCALE)
-                increaseWeight(petModel)
-                print("[TOCHIPYRO] Reapplied enlargement to pet:", petModel.Name)
             end
         end
     end)
@@ -198,14 +220,21 @@ local function enlargeCurrentPet()
         return
     end
 
-    -- Store original sizes before enlarging
-    storeOriginalSizes(pet)
+    print("[TOCHIPYRO] Found pet to enlarge:", pet.Name)
+    
+    -- Store original sizes before enlarging (only if not already stored)
+    local id = getPetUniqueId(pet)
+    if id and not originalPartSizes[id] then
+        storeOriginalSizes(pet)
+        print("[TOCHIPYRO] Stored original sizes for pet:", pet.Name)
+    end
+    
     scaleModelWithJoints(pet, ENLARGE_SCALE)
     increaseWeight(pet)
     markPetAsEnlarged(pet)
     startPetMonitor(pet)
 
-    print("[TOCHIPYRO] Enlarged pet:", pet.Name)
+    print("[TOCHIPYRO] Successfully enlarged pet:", pet.Name)
 end
 
 -- Monitor pets added to workspace/garden/pet slots to auto-enlarge if previously marked
