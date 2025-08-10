@@ -1,20 +1,32 @@
--- Grow a Garden - Persistent Pet Enlargement (Local Visual Only)
+-- Grow a Garden - Persistent Pet Enlargement (Local Visual Only, Unique Pet IDs)
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
 
--- Table to store pets we have enlarged (by unique name/id)
+-- Table to store pets we have enlarged (by unique ID)
 local enlargedPets = {}
+
+-- Get unique identifier for a model
+local function getPetId(model)
+	if typeof(model) == "Instance" then
+		if model.GetDebugId then
+			return model:GetDebugId()
+		else
+			return model:GetFullName()
+		end
+	end
+	return tostring(model)
+end
 
 -- Function to detect if a model is a pet
 local function isPetModel(model)
 	if not model:IsA("Model") then return false end
 	if model:FindFirstChildOfClass("Humanoid") then return false end
 	if model:FindFirstChildWhichIsA("BasePart") then
-		-- Optional: filter by tags/names if game uses them
+		-- Optional: expand keywords for other pets
 		local nameLower = string.lower(model.Name)
-		if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich") 
+		if nameLower:find("pet") or nameLower:find("raccoon") or nameLower:find("ostrich")
 		or nameLower:find("fox") or nameLower:find("bunny") or nameLower:find("duck") then
 			return true
 		end
@@ -42,8 +54,9 @@ end
 local function enlargePet(pet, factor)
 	if not pet or not pet:IsDescendantOf(workspace) then return end
 	scaleModelWithJoints(pet, factor)
-	enlargedPets[pet.Name] = factor -- store factor by name (can be changed to unique ID if available)
-	print("Enlarged pet:", pet.Name, "Factor:", factor)
+	local petId = getPetId(pet)
+	enlargedPets[petId] = factor
+	print("Enlarged pet:", pet.Name, "ID:", petId, "Factor:", factor)
 end
 
 -- Detect held pet
@@ -60,10 +73,13 @@ end
 
 -- Reapply enlargement when pets spawn
 workspace.DescendantAdded:Connect(function(desc)
-	if isPetModel(desc) and enlargedPets[desc.Name] then
-		task.wait(0.2) -- small delay to let it load
-		scaleModelWithJoints(desc, enlargedPets[desc.Name])
-		print("Re-applied enlargement to:", desc.Name)
+	if isPetModel(desc) then
+		local petId = getPetId(desc)
+		if enlargedPets[petId] then
+			task.wait(0.2) -- Let it load fully
+			scaleModelWithJoints(desc, enlargedPets[petId])
+			print("Re-applied enlargement to:", desc.Name, "ID:", petId)
+		end
 	end
 end)
 
