@@ -83,7 +83,7 @@ local function makeBtn(text, y)
     local c = Instance.new("UICorner", b)
     c.CornerRadius = UDim.new(0, 10)
     return b
-end
+end)
 
 ----------------------------------------------------------------
 -- VISUAL-ONLY COOLDOWN REWRITER
