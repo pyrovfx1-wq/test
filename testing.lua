@@ -85,19 +85,6 @@ local function makeBtn(text, y)
     return b
 end
 
-local reduceBtn = makeBtn("Reduce Cooldown: OFF", 60)
-local bypassBtn = makeBtn("Bypass", 112)
-local closeBtn  = makeBtn("Close UI", 164)
-closeBtn.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
-
-closeBtn.MouseButton1Click:Connect(function()
-    screenGui:Destroy()
-end)
-
-bypassBtn.MouseButton1Click:Connect(function()
-    print("[TOCHIPYRO] Bypass placeholder clicked.")
-end)
-
 ----------------------------------------------------------------
 -- VISUAL-ONLY COOLDOWN REWRITER
 ----------------------------------------------------------------
@@ -210,6 +197,38 @@ reduceBtn.MouseButton1Click:Connect(function()
         scanAll()
     else
         restoreAll()
+    end
+end)
+
+-- Dragging system
+MainFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainFrame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+MainFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or 
+       input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainFrame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
     end
 end)
 
