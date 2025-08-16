@@ -1,9 +1,7 @@
 -- TOCHIPYRO — Grow a Garden UI (visual-only)
 -- Delta/Syn/KRNL safe. Purely cosmetic: changes "Every 6.57m" -> "Every 0.15m" in Pet Loadout view text.
--- If you want to hard-lock to a place, add a PlaceId check yourself.
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
@@ -27,7 +25,6 @@ main.BackgroundColor3 = Color3.new(0, 0, 0)
 main.BackgroundTransparency = 0.5 -- 50%
 main.BorderSizePixel = 0
 main.Active = true
-main.Draggable = true
 main.Parent = screenGui
 
 local corner = Instance.new("UICorner", main)
@@ -42,7 +39,7 @@ title.TextScaled = true
 title.Text = "TOCHIPYRO"
 title.Parent = main
 
--- rainbow
+-- rainbow title
 task.spawn(function()
     local h = 0
     while screenGui.Parent do
@@ -83,6 +80,54 @@ local function makeBtn(text, y)
     local c = Instance.new("UICorner", b)
     c.CornerRadius = UDim.new(0, 10)
     return b
+end
+
+local reduceBtn = makeBtn("Reduce Cooldown: OFF", 60)
+local closeBtn  = makeBtn("Close UI", 164)
+closeBtn.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
+
+closeBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
+end)
+
+----------------------------------------------------------------
+-- Dragging System (new)
+----------------------------------------------------------------
+local UserInputService = game:GetService("UserInputService")
+local dragging, dragInput, dragStart, startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    main.Position = UDim2.new(
+        startPos.X.Scale, startPos.X.Offset + delta.X,
+        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+    )
+end
+
+main.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+main.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
 end)
 
 ----------------------------------------------------------------
@@ -124,7 +169,6 @@ end
 local function looksLikeCooldownLine(s)
     local lower = string.lower(s)
     if not lower:find("every") then return false end
-    -- has a time token like 6.57m or 6:57m or 2h
     return lower:find("[%d:%.]+%s*[smhd]") ~= nil
 end
 
@@ -132,7 +176,6 @@ local function processLabel(lbl)
     if not lbl or not lbl:IsA("TextLabel") then return end
     if not isInTargetArea(lbl) then return end
 
-    -- attach watcher once
     if not watched[lbl] then
         watched[lbl] = lbl:GetPropertyChangedSignal("Text"):Connect(function()
             if reduceEnabled and looksLikeCooldownLine(lbl.Text) then
@@ -142,7 +185,6 @@ local function processLabel(lbl)
         end)
         lbl.AncestryChanged:Connect(function(_, parent)
             if not parent then
-                -- clean up
                 if watched[lbl] then
                     pcall(function() watched[lbl]:Disconnect() end)
                     watched[lbl] = nil
@@ -164,15 +206,12 @@ local function scanAll()
     end
 end
 
--- react to new GUI becoming visible (like opening Pet Loadout view)
 local descConn = PlayerGui.DescendantAdded:Connect(function(obj)
     if obj:IsA("TextLabel") then
-        -- tiny delay to let game set the text first
         task.defer(function() processLabel(obj) end)
     end
 end)
 
--- periodic refresher (in case the game rewrites the text each frame)
 task.spawn(function()
     while screenGui.Parent do
         if reduceEnabled then scanAll() end
@@ -180,7 +219,6 @@ task.spawn(function()
     end
 end)
 
--- toggle behavior
 local function restoreAll()
     for lbl, original in pairs(originals) do
         if lbl and lbl.Parent and type(original) == "string" then
@@ -200,37 +238,4 @@ reduceBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Dragging system
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or 
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-        input.Changed:Connect(function()
-            if input.UserInputState == Enum.UserInputState.End then
-                dragging = false
-            end
-        end)
-    end
-end)
-
-MainFrame.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or 
-       input.UserInputType == Enum.UserInputType.Touch then
-        dragInput = input
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if input == dragInput and dragging then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
--- initial quick pass (in case Pet Loadout is already open)
 scanAll()
