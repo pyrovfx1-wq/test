@@ -1,8 +1,8 @@
 -- TOCHIPYRO UI Script (Grow a Garden Only)
 -- Works on any Roblox Executor
--- Fake visual cooldown on pet panel
+-- Fake visual cooldown text (e.g. "Every 6.57m" → "Every 0.15m")
 
-if game.PlaceId ~= 126884695634066 then -- Replace with Grow a Garden place ID
+if game.PlaceId ~= 123456789 then -- Replace with Grow a Garden place ID
     warn("TOCHIPYRO only works on Grow a Garden!")
     return
 end
@@ -24,7 +24,6 @@ mainFrame.BackgroundColor3 = Color3.new(0, 0, 0)
 mainFrame.BackgroundTransparency = 0.5
 mainFrame.BorderSizePixel = 0
 mainFrame.Parent = screenGui
-mainFrame.ClipsDescendants = true
 mainFrame.Active = true
 mainFrame.Draggable = true
 
@@ -71,43 +70,8 @@ minimize.MouseButton1Click:Connect(function()
     end
 end)
 
--- Fake cooldown visual handler
+-- Reduce Cooldown toggle
 local reduceEnabled = false
-local function addFakeCooldown(petButton)
-    if not petButton then return end
-    local fakeBar = petButton:FindFirstChild("FakeCooldown")
-    if fakeBar then fakeBar:Destroy() end
-
-    local bar = Instance.new("Frame")
-    bar.Name = "FakeCooldown"
-    bar.Size = UDim2.new(1, 0, 1, 0)
-    bar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    bar.BackgroundTransparency = 0.5
-    bar.ZIndex = 10
-    bar.Parent = petButton
-
-    local timerLabel = Instance.new("TextLabel")
-    timerLabel.Size = UDim2.new(1, 0, 1, 0)
-    timerLabel.BackgroundTransparency = 1
-    timerLabel.TextColor3 = Color3.new(1, 1, 1)
-    timerLabel.Font = Enum.Font.SourceSansBold
-    timerLabel.TextScaled = true
-    timerLabel.Text = "15"
-    timerLabel.ZIndex = 11
-    timerLabel.Parent = bar
-
-    -- Countdown visually from 15 → 0
-    task.spawn(function()
-        for i = 15, 0, -1 do
-            if not bar.Parent then return end
-            timerLabel.Text = tostring(i)
-            task.wait(1)
-        end
-        bar:Destroy()
-    end)
-end
-
--- Reduce Cooldown Button (Toggle)
 local reduceCooldown = Instance.new("TextButton")
 reduceCooldown.Size = UDim2.new(0.8, 0, 0, 40)
 reduceCooldown.Position = UDim2.new(0.1, 0, 0.2, 0)
@@ -126,19 +90,31 @@ reduceCooldown.MouseButton1Click:Connect(function()
     end
 end)
 
--- Hook into pet ability buttons (visual only)
-local PetGui = LocalPlayer:WaitForChild("PlayerGui"):WaitForChild("PetView", 10) -- adjust name if different
-if PetGui then
-    for _, petButton in pairs(PetGui:GetDescendants()) do
-        if petButton:IsA("ImageButton") or petButton:IsA("TextButton") then
-            petButton.MouseButton1Click:Connect(function()
-                if reduceEnabled then
-                    addFakeCooldown(petButton)
-                end
-            end)
+-- Function to fake cooldown text
+local function updatePetTexts()
+    local PetGui = LocalPlayer:FindFirstChild("PlayerGui")
+    if not PetGui then return end
+
+    -- Look for all TextLabels under Pet Panels
+    for _, obj in pairs(PetGui:GetDescendants()) do
+        if obj:IsA("TextLabel") and obj.Text:lower():find("every") then
+            if reduceEnabled then
+                obj.Text = obj.Text:gsub("Every%s[%d%.]+[mh]", "Every 0.15m")
+            else
+                -- Do nothing, it will refresh naturally when pet panel reopens
+            end
         end
     end
 end
+
+-- Keep checking/updating texts while enabled
+task.spawn(function()
+    while task.wait(1) do
+        if reduceEnabled then
+            updatePetTexts()
+        end
+    end
+end)
 
 -- Bypass Button
 local bypassBtn = Instance.new("TextButton")
@@ -151,7 +127,7 @@ bypassBtn.BackgroundColor3 = Color3.fromRGB(90, 90, 90)
 bypassBtn.Parent = mainFrame
 
 bypassBtn.MouseButton1Click:Connect(function()
-    print("Bypass Activated!") -- put your bypass code here
+    print("Bypass Activated!") -- placeholder
 end)
 
 -- Close Button
