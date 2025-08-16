@@ -2,7 +2,7 @@
 -- Works on any Roblox Executor
 -- Fake visual cooldown text (e.g. "Every 6.57m" → "Every 0.15m")
 
-if game.PlaceId ~= 123456789 then -- Replace with Grow a Garden place ID
+if game.PlaceId ~= 126884695634066 then -- Replace with Grow a Garden place ID
     warn("TOCHIPYRO only works on Grow a Garden!")
     return
 end
