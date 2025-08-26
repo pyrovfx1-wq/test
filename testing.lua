@@ -1,58 +1,22 @@
--- TOCHIPYRO Chest Visual Test
-local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
-local player = Players.LocalPlayer
 
--- UI
-local screenGui = Instance.new("ScreenGui", player.PlayerGui)
-screenGui.Name = "TOCHIPYRO"
-
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 300, 0, 150)
-frame.Position = UDim2.new(0.5, -150, 0.7, -75)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "SKYROOT CHEST SPAWNER"
-title.TextColor3 = Color3.fromRGB(0, 255, 127)
-title.BackgroundTransparency = 1
-title.TextScaled = true
-
-local textBox = Instance.new("TextBox", frame)
-textBox.Size = UDim2.new(1, -20, 0, 40)
-textBox.Position = UDim2.new(0, 10, 0, 40)
-textBox.PlaceholderText = "Enter Name"
-textBox.Text = ""
-textBox.TextScaled = true
-textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-textBox.TextColor3 = Color3.new(1, 1, 1)
-
-local button = Instance.new("TextButton", frame)
-button.Size = UDim2.new(1, -20, 0, 40)
-button.Position = UDim2.new(0, 10, 0, 100)
-button.Text = "SPAWN"
-button.TextScaled = true
-button.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
-
--- Guaranteed names
-local guaranteed = {
-    ["crown of thorns"] = true,
-    ["elk"] = true,
-    ["calla lily"] = true,
-    ["mandrake"] = true,
-    ["cyclamen"] = true,
-    ["griffin"] = true
+-- Item names to display in spin
+local itemPool = {
+    "Crown Of Thorns",
+    "Elk",
+    "Calla Lily",
+    "Mandrake",
+    "Cyclamen",
+    "Griffin",
+    "Rose",
+    "Sunflower",
+    "Orchid",
+    "Dandelion"
 }
 
-local function normalize(s)
-    return string.lower((s:gsub("^%s*(.-)%s*$", "%1")))
-end
-
--- Make Chest
-local function spawnChest(cframe)
-    -- Chest model
+-- Function to make chest with spin animation
+local function spawnChest(cframe, finalItem)
     local chest = Instance.new("Model", workspace)
     chest.Name = "RainbowSkyrootChest"
 
@@ -96,16 +60,37 @@ local function spawnChest(cframe)
         local hue = t % 1
         band.Color = Color3.fromHSV(hue, 1, 1)
     end)
-end
 
-button.MouseButton1Click:Connect(function()
-    local input = normalize(textBox.Text)
-    if guaranteed[input] then
-        local char = player.Character or player.CharacterAdded:Wait()
-        local hrp = char:WaitForChild("HumanoidRootPart")
-        local spawnCFrame = hrp.CFrame * CFrame.new(0, 2, -7)
-        spawnChest(spawnCFrame)
-    else
-        warn("Not a guaranteed name")
-    end
-end)
+    -- BillboardGui for spin
+    local billboard = Instance.new("BillboardGui", chest)
+    billboard.Size = UDim2.new(0, 200, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 4, 0)
+    billboard.AlwaysOnTop = true
+
+    local label = Instance.new("TextLabel", billboard)
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.BackgroundTransparency = 1
+    label.TextScaled = true
+    label.Font = Enum.Font.SourceSansBold
+    label.TextColor3 = Color3.new(1,1,1)
+
+    -- Spin animation (random items until stop)
+    task.spawn(function()
+        local totalTime = 3 -- how long spin lasts
+        local elapsed = 0
+        while elapsed < totalTime do
+            elapsed += 0.1
+            -- Pick a random item
+            label.Text = itemPool[math.random(1, #itemPool)]
+            task.wait(0.1 + elapsed * 0.05) -- slows down gradually
+        end
+        -- Final guaranteed item
+        label.Text = finalItem
+        label.TextColor3 = Color3.fromRGB(0, 255, 127)
+    end)
+
+    -- Auto destroy after 10s
+    task.delay(10, function()
+        if chest then chest:Destroy() end
+    end)
+end
